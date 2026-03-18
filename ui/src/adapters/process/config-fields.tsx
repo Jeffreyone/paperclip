@@ -2,8 +2,9 @@ import type { AdapterConfigFieldsProps } from "../types";
 import {
   Field,
   DraftInput,
-  help,
+  useAdapterHelp,
 } from "../../components/agent-config-primitives";
+import { useTranslation } from "react-i18next";
 
 const inputClass =
   "w-full rounded-md border border-border px-2.5 py-1.5 bg-transparent outline-none text-sm font-mono placeholder:text-muted-foreground/40";
@@ -32,9 +33,12 @@ export function ProcessConfigFields({
   eff,
   mark,
 }: AdapterConfigFieldsProps) {
+  const { t } = useTranslation();
+  const help = useAdapterHelp();
+  
   return (
     <>
-      <Field label="Command" hint={help.command}>
+      <Field label={t("adapter.command")} hint={help.command}>
         <DraftInput
           value={
             isCreate
@@ -51,7 +55,7 @@ export function ProcessConfigFields({
           placeholder="e.g. node, python"
         />
       </Field>
-      <Field label="Args (comma-separated)" hint={help.args}>
+      <Field label={t("adapter.args")} hint={help.args}>
         <DraftInput
           value={
             isCreate

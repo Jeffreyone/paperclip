@@ -218,7 +218,7 @@ function quickstartDefaultsFromEnv(): {
   if (deploymentMode === "local_trusted" && process.env.PAPERCLIP_DEPLOYMENT_EXPOSURE !== undefined) {
     ignoredEnvKeys.push({
       key: "PAPERCLIP_DEPLOYMENT_EXPOSURE",
-      reason: "Ignored because deployment mode local_trusted always forces private exposure",
+      reason: "由于部署模式 local_trusted 始终强制使用私有暴露，已忽略",
     });
   }
 
@@ -260,26 +260,26 @@ export async function onboard(opts: OnboardOptions): Promise<void> {
 
   let setupMode: SetupMode = "quickstart";
   if (opts.yes) {
-    p.log.message(pc.dim("`--yes` enabled: using Quickstart defaults."));
+    p.log.message(pc.dim("已启用 `--yes`：使用快速默认配置。"));
   } else {
     const setupModeChoice = await p.select({
-      message: "Choose setup path",
+      message: "选择安装方式",
       options: [
         {
           value: "quickstart" as const,
-          label: "Quickstart",
-          hint: "Recommended: local defaults + ready to run",
+          label: "快速安装",
+          hint: "推荐：本地默认配置，立即可用",
         },
         {
           value: "advanced" as const,
-          label: "Advanced setup",
-          hint: "Customize database, server, storage, and more",
+          label: "高级配置",
+          hint: "自定义数据库、服务器、存储等",
         },
       ],
       initialValue: "quickstart",
     });
     if (p.isCancel(setupModeChoice)) {
-      p.cancel("Setup cancelled.");
+      p.cancel("安装已取消。");
       return;
     }
     setupMode = setupModeChoice as SetupMode;
@@ -297,28 +297,28 @@ export async function onboard(opts: OnboardOptions): Promise<void> {
   } = derivedDefaults;
 
   if (setupMode === "advanced") {
-    p.log.step(pc.bold("Database"));
+    p.log.step(pc.bold("数据库"));
     database = await promptDatabase(database);
 
     if (database.mode === "postgres" && database.connectionString) {
       const s = p.spinner();
-      s.start("Testing database connection...");
+      s.start("正在测试数据库连接...");
       try {
         const { createDb } = await import("@paperclipai/db");
         const db = createDb(database.connectionString);
         await db.execute("SELECT 1");
-        s.stop("Database connection successful");
+        s.stop("数据库连接成功");
       } catch {
-        s.stop(pc.yellow("Could not connect to database — you can fix this later with `paperclipai doctor`"));
+        s.stop(pc.yellow("无法连接到数据库 — 您可以稍后使用 `paperclipai doctor` 修复"));
       }
     }
 
-    p.log.step(pc.bold("LLM Provider"));
+    p.log.step(pc.bold("LLM 提供商"));
     llm = await promptLlm();
 
     if (llm?.apiKey) {
       const s = p.spinner();
-      s.start("Validating API key...");
+      s.start("正在验证 API 密钥...");
       try {
         if (llm.provider === "claude") {
           const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -335,39 +335,39 @@ export async function onboard(opts: OnboardOptions): Promise<void> {
             }),
           });
           if (res.ok || res.status === 400) {
-            s.stop("API key is valid");
+            s.stop("API 密钥有效");
           } else if (res.status === 401) {
-            s.stop(pc.yellow("API key appears invalid — you can update it later"));
+            s.stop(pc.yellow("API 密钥可能无效 — 您可以稍后更新"));
           } else {
-            s.stop(pc.yellow("Could not validate API key — continuing anyway"));
+            s.stop(pc.yellow("无法验证 API 密钥 — 继续安装"));
           }
         } else {
           const res = await fetch("https://api.openai.com/v1/models", {
             headers: { Authorization: `Bearer ${llm.apiKey}` },
           });
           if (res.ok) {
-            s.stop("API key is valid");
+            s.stop("API 密钥有效");
           } else if (res.status === 401) {
-            s.stop(pc.yellow("API key appears invalid — you can update it later"));
+            s.stop(pc.yellow("API 密钥可能无效 — 您可以稍后更新"));
           } else {
-            s.stop(pc.yellow("Could not validate API key — continuing anyway"));
+            s.stop(pc.yellow("无法验证 API 密钥 — 继续安装"));
           }
         }
       } catch {
-        s.stop(pc.yellow("Could not reach API — continuing anyway"));
+        s.stop(pc.yellow("无法连接到 API — 继续安装"));
       }
     }
 
-    p.log.step(pc.bold("Logging"));
+    p.log.step(pc.bold("日志"));
     logging = await promptLogging();
 
-    p.log.step(pc.bold("Server"));
+    p.log.step(pc.bold("服务器"));
     ({ server, auth } = await promptServer({ currentServer: server, currentAuth: auth }));
 
-    p.log.step(pc.bold("Storage"));
+    p.log.step(pc.bold("存储"));
     storage = await promptStorage(storage);
 
-    p.log.step(pc.bold("Secrets"));
+    p.log.step(pc.bold("密钥"));
     const secretsDefaults = defaultSecretsConfig();
     secrets = {
       provider: secrets.provider ?? secretsDefaults.provider,
@@ -378,32 +378,32 @@ export async function onboard(opts: OnboardOptions): Promise<void> {
     };
     p.log.message(
       pc.dim(
-        `Using defaults: provider=${secrets.provider}, strictMode=${secrets.strictMode}, keyFile=${secrets.localEncrypted.keyFilePath}`,
+        `使用默认配置：provider=${secrets.provider}, strictMode=${secrets.strictMode}, keyFile=${secrets.localEncrypted.keyFilePath}`,
       ),
     );
   } else {
-    p.log.step(pc.bold("Quickstart"));
-    p.log.message(pc.dim("Using quickstart defaults."));
+    p.log.step(pc.bold("快速安装"));
+    p.log.message(pc.dim("使用快速安装默认配置。"));
     if (usedEnvKeys.length > 0) {
-      p.log.message(pc.dim(`Environment-aware defaults active (${usedEnvKeys.length} env var(s) detected).`));
+      p.log.message(pc.dim(`已检测到环境变量覆盖（${usedEnvKeys.length} 个环境变量）。`));
     } else {
       p.log.message(
-        pc.dim("No environment overrides detected: embedded database, file storage, local encrypted secrets."),
+        pc.dim("未检测到环境变量覆盖：使用嵌入式数据库、文件存储、本地加密密钥。"),
       );
     }
     for (const ignored of ignoredEnvKeys) {
-      p.log.message(pc.dim(`Ignored ${ignored.key}: ${ignored.reason}`));
+      p.log.message(pc.dim(`已忽略 ${ignored.key}：${ignored.reason}`));
     }
   }
 
   const jwtSecret = ensureAgentJwtSecret(configPath);
   const envFilePath = resolveAgentJwtEnvFile(configPath);
   if (jwtSecret.created) {
-    p.log.success(`Created ${pc.cyan("PAPERCLIP_AGENT_JWT_SECRET")} in ${pc.dim(envFilePath)}`);
+    p.log.success(`已创建 ${pc.cyan("PAPERCLIP_AGENT_JWT_SECRET")} 于 ${pc.dim(envFilePath)}`);
   } else if (process.env.PAPERCLIP_AGENT_JWT_SECRET?.trim()) {
-    p.log.info(`Using existing ${pc.cyan("PAPERCLIP_AGENT_JWT_SECRET")} from environment`);
+    p.log.info(`使用环境中的现有 ${pc.cyan("PAPERCLIP_AGENT_JWT_SECRET")}`);
   } else {
-    p.log.info(`Using existing ${pc.cyan("PAPERCLIP_AGENT_JWT_SECRET")} in ${pc.dim(envFilePath)}`);
+    p.log.info(`使用 ${pc.dim(envFilePath)} 中的现有 ${pc.cyan("PAPERCLIP_AGENT_JWT_SECRET")}`);
   }
 
   const config: PaperclipConfig = {
@@ -423,46 +423,46 @@ export async function onboard(opts: OnboardOptions): Promise<void> {
 
   const keyResult = ensureLocalSecretsKeyFile(config, configPath);
   if (keyResult.status === "created") {
-    p.log.success(`Created local secrets key file at ${pc.dim(keyResult.path)}`);
+    p.log.success(`已创建本地密钥文件：${pc.dim(keyResult.path)}`);
   } else if (keyResult.status === "existing") {
-    p.log.message(pc.dim(`Using existing local secrets key file at ${keyResult.path}`));
+    p.log.message(pc.dim(`使用现有本地密钥文件：${keyResult.path}`));
   }
 
   writeConfig(config, opts.config);
 
   p.note(
     [
-      `Database: ${database.mode}`,
-      llm ? `LLM: ${llm.provider}` : "LLM: not configured",
-      `Logging: ${logging.mode} -> ${logging.logDir}`,
-      `Server: ${server.deploymentMode}/${server.exposure} @ ${server.host}:${server.port}`,
-      `Allowed hosts: ${server.allowedHostnames.length > 0 ? server.allowedHostnames.join(", ") : "(loopback only)"}`,
-      `Auth URL mode: ${auth.baseUrlMode}${auth.publicBaseUrl ? ` (${auth.publicBaseUrl})` : ""}`,
-      `Storage: ${storage.provider}`,
-      `Secrets: ${secrets.provider} (strict mode ${secrets.strictMode ? "on" : "off"})`,
-      "Agent auth: PAPERCLIP_AGENT_JWT_SECRET configured",
+      `数据库：${database.mode}`,
+      llm ? `LLM：${llm.provider}` : "LLM：未配置",
+      `日志：${logging.mode} -> ${logging.logDir}`,
+      `服务器：${server.deploymentMode}/${server.exposure} @ ${server.host}:${server.port}`,
+      `允许的主机：${server.allowedHostnames.length > 0 ? server.allowedHostnames.join(", ") : "（仅 loopback）"}`,
+      `认证 URL 模式：${auth.baseUrlMode}${auth.publicBaseUrl ? ` (${auth.publicBaseUrl})` : ""}`,
+      `存储：${storage.provider}`,
+      `密钥：${secrets.provider}（严格模式 ${secrets.strictMode ? "开启" : "关闭"}）`,
+      "Agent 认证：PAPERCLIP_AGENT_JWT_SECRET 已配置",
     ].join("\n"),
-    "Configuration saved",
+    "配置已保存",
   );
 
   p.note(
     [
-      `Run: ${pc.cyan("paperclipai run")}`,
-      `Reconfigure later: ${pc.cyan("paperclipai configure")}`,
-      `Diagnose setup: ${pc.cyan("paperclipai doctor")}`,
+      `运行：${pc.cyan("paperclipai run")}`,
+      `重新配置：${pc.cyan("paperclipai configure")}`,
+      `诊断问题：${pc.cyan("paperclipai doctor")}`,
     ].join("\n"),
-    "Next commands",
+    "后续命令",
   );
 
   if (canCreateBootstrapInviteImmediately({ database, server })) {
-    p.log.step("Generating bootstrap CEO invite");
+    p.log.step("正在生成引导 CEO 邀请");
     await bootstrapCeoInvite({ config: configPath });
   }
 
   let shouldRunNow = opts.run === true || opts.yes === true;
   if (!shouldRunNow && !opts.invokedByRun && process.stdin.isTTY && process.stdout.isTTY) {
     const answer = await p.confirm({
-      message: "Start Paperclip now?",
+      message: "是否立即启动 Paperclip？",
       initialValue: true,
     });
     if (!p.isCancel(answer)) {
@@ -480,12 +480,12 @@ export async function onboard(opts: OnboardOptions): Promise<void> {
   if (server.deploymentMode === "authenticated" && database.mode === "embedded-postgres") {
     p.log.info(
       [
-        "Bootstrap CEO invite will be created after the server starts.",
-        `Next: ${pc.cyan("paperclipai run")}`,
-        `Then: ${pc.cyan("paperclipai auth bootstrap-ceo")}`,
+        "服务器启动后将创建引导 CEO 邀请。",
+        `下一步：${pc.cyan("paperclipai run")}`,
+        `然后：${pc.cyan("paperclipai auth bootstrap-ceo")}`,
       ].join("\n"),
     );
   }
 
-  p.outro("You're all set!");
+  p.outro("安装完成！");
 }

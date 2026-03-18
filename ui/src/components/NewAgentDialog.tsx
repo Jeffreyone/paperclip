@@ -1,6 +1,7 @@
-import { useState, type ComponentType } from "react";
+import { useState, useMemo, type ComponentType } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@/lib/router";
+import { useTranslation } from "react-i18next";
 import { useDialog } from "../context/DialogContext";
 import { useCompany } from "../context/CompanyContext";
 import { agentsApi } from "../api/agents";
@@ -31,64 +32,45 @@ type AdvancedAdapterType =
   | "cursor"
   | "openclaw_gateway";
 
-const ADVANCED_ADAPTER_OPTIONS: Array<{
-  value: AdvancedAdapterType;
-  label: string;
-  desc: string;
-  icon: ComponentType<{ className?: string }>;
-  recommended?: boolean;
-}> = [
-  {
-    value: "claude_local",
-    label: "Claude Code",
-    icon: Sparkles,
-    desc: "Local Claude agent",
-    recommended: true,
-  },
-  {
-    value: "codex_local",
-    label: "Codex",
-    icon: Code,
-    desc: "Local Codex agent",
-    recommended: true,
-  },
-  {
-    value: "gemini_local",
-    label: "Gemini CLI",
-    icon: Gem,
-    desc: "Local Gemini agent",
-  },
-  {
-    value: "opencode_local",
-    label: "OpenCode",
-    icon: OpenCodeLogoIcon,
-    desc: "Local multi-provider agent",
-  },
-  {
-    value: "pi_local",
-    label: "Pi",
-    icon: Terminal,
-    desc: "Local Pi agent",
-  },
-  {
-    value: "cursor",
-    label: "Cursor",
-    icon: MousePointer2,
-    desc: "Local Cursor agent",
-  },
-  {
-    value: "openclaw_gateway",
-    label: "OpenClaw Gateway",
-    icon: Bot,
-    desc: "Invoke OpenClaw via gateway protocol",
-  },
-];
+const adapterTypeKeys: Record<AdvancedAdapterType, { label: string; desc: string }> = {
+  claude_local: { label: "agent.adapterClaudeLocal", desc: "agent.adapterClaudeLocalDesc" },
+  codex_local: { label: "agent.adapterCodexLocal", desc: "agent.adapterCodexLocalDesc" },
+  gemini_local: { label: "agent.adapterGeminiLocal", desc: "agent.adapterGeminiLocalDesc" },
+  opencode_local: { label: "agent.adapterOpencodeLocal", desc: "agent.adapterOpencodeLocalDesc" },
+  pi_local: { label: "agent.adapterPiLocal", desc: "agent.adapterPiLocalDesc" },
+  cursor: { label: "agent.adapterCursor", desc: "agent.adapterCursorDesc" },
+  openclaw_gateway: { label: "agent.adapterOpenclawGateway", desc: "agent.adapterOpenclawGatewayDesc" },
+};
+
+const adapterIcons: Record<AdvancedAdapterType, ComponentType<{ className?: string }>> = {
+  claude_local: Sparkles,
+  codex_local: Code,
+  gemini_local: Gem,
+  opencode_local: OpenCodeLogoIcon,
+  pi_local: Terminal,
+  cursor: MousePointer2,
+  openclaw_gateway: Bot,
+};
+
+const recommendedAdapters: AdvancedAdapterType[] = ["claude_local", "codex_local"];
 
 export function NewAgentDialog() {
+  const { t } = useTranslation();
   const { newAgentOpen, closeNewAgent, openNewIssue } = useDialog();
   const { selectedCompanyId } = useCompany();
   const navigate = useNavigate();
   const [showAdvancedCards, setShowAdvancedCards] = useState(false);
+
+  const adapterLabels = useMemo(() => {
+    const result: Record<AdvancedAdapterType, { label: string; desc: string }> = {} as typeof adapterTypeKeys;
+    for (const [key, i18nKeys] of Object.entries(adapterTypeKeys)) {
+      result[key as AdvancedAdapterType] = {
+        label: t(i18nKeys.label),
+        desc: t(i18nKeys.desc),
+      };
+    }
+    return result;
+  }, [t]);
 
   const { data: agents } = useQuery({
     queryKey: queryKeys.agents.list(selectedCompanyId!),
@@ -102,8 +84,8 @@ export function NewAgentDialog() {
     closeNewAgent();
     openNewIssue({
       assigneeAgentId: ceoAgent?.id,
-      title: "Create a new agent",
-      description: "(type in what kind of agent you want here)",
+      title: t("agent.createNewAgentTitle"),
+      description: t("agent.createNewAgentDesc"),
     });
   }
 
@@ -133,7 +115,7 @@ export function NewAgentDialog() {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
-          <span className="text-sm text-muted-foreground">Add a new agent</span>
+          <span className="text-sm text-muted-foreground">{t("agent.addNewAgent")}</span>
           <Button
             variant="ghost"
             size="icon-xs"
@@ -156,15 +138,13 @@ export function NewAgentDialog() {
                   <Sparkles className="h-6 w-6 text-foreground" />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  We recommend letting your CEO handle agent setup — they know the
-                  org structure and can configure reporting, permissions, and
-                  adapters.
+                  {t("agent.recommendation")}
                 </p>
               </div>
 
               <Button className="w-full" size="lg" onClick={handleAskCeo}>
                 <Bot className="h-4 w-4 mr-2" />
-                Ask the CEO to create a new agent
+                {t("agent.askCeoToCreate")}
               </Button>
 
               {/* Advanced link */}
@@ -173,7 +153,7 @@ export function NewAgentDialog() {
                   className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
                   onClick={handleAdvancedConfig}
                 >
-                  I want advanced configuration myself
+                  {t("agent.advancedConfig")}
                 </button>
               </div>
             </>
@@ -185,31 +165,34 @@ export function NewAgentDialog() {
                   onClick={() => setShowAdvancedCards(false)}
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
-                  Back
+                  {t("common.back")}
                 </button>
                 <p className="text-sm text-muted-foreground">
-                  Choose your adapter type for advanced setup.
+                  {t("agent.chooseAdapterType")}
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                {ADVANCED_ADAPTER_OPTIONS.map((opt) => (
+                {(Object.keys(adapterLabels) as AdvancedAdapterType[]).map((key) => (
                   <button
-                    key={opt.value}
+                    key={key}
                     className={cn(
                       "flex flex-col items-center gap-1.5 rounded-md border border-border p-3 text-xs transition-colors hover:bg-accent/50 relative"
                     )}
-                    onClick={() => handleAdvancedAdapterPick(opt.value)}
+                    onClick={() => handleAdvancedAdapterPick(key)}
                   >
-                    {opt.recommended && (
+                    {recommendedAdapters.includes(key) && (
                       <span className="absolute -top-1.5 right-1.5 bg-green-500 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded-full leading-none">
-                        Recommended
+                        {t("common.recommended")}
                       </span>
                     )}
-                    <opt.icon className="h-4 w-4" />
-                    <span className="font-medium">{opt.label}</span>
+                    {(() => {
+                      const Icon = adapterIcons[key];
+                      return <Icon className="h-4 w-4" />;
+                    })()}
+                    <span className="font-medium">{adapterLabels[key].label}</span>
                     <span className="text-muted-foreground text-[10px]">
-                      {opt.desc}
+                      {adapterLabels[key].desc}
                     </span>
                   </button>
                 ))}

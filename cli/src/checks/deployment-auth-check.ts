@@ -14,17 +14,17 @@ export function deploymentAuthCheck(config: PaperclipConfig): CheckResult {
   if (mode === "local_trusted") {
     if (!isLoopbackHost(config.server.host)) {
       return {
-        name: "Deployment/auth mode",
+        name: "部署/认证模式",
         status: "fail",
-        message: `local_trusted requires loopback host binding (found ${config.server.host})`,
+        message: `local_trusted 模式需要绑定到 loopback 主机（当前为 ${config.server.host}）`,
         canRepair: false,
-        repairHint: "Run `paperclipai configure --section server` and set host to 127.0.0.1",
+        repairHint: "运行 `paperclipai configure --section server` 并将主机设置为 127.0.0.1",
       };
     }
     return {
-      name: "Deployment/auth mode",
+      name: "部署/认证模式",
       status: "pass",
-      message: "local_trusted mode is configured for loopback-only access",
+      message: "local_trusted 模式已配置为仅本地访问",
     };
   }
 
@@ -33,59 +33,59 @@ export function deploymentAuthCheck(config: PaperclipConfig): CheckResult {
     process.env.PAPERCLIP_AGENT_JWT_SECRET?.trim();
   if (!secret) {
     return {
-      name: "Deployment/auth mode",
+      name: "部署/认证模式",
       status: "fail",
-      message: "authenticated mode requires BETTER_AUTH_SECRET (or PAPERCLIP_AGENT_JWT_SECRET)",
+      message: "authenticated 模式需要 BETTER_AUTH_SECRET（或 PAPERCLIP_AGENT_JWT_SECRET）",
       canRepair: false,
-      repairHint: "Set BETTER_AUTH_SECRET before starting Paperclip",
+      repairHint: "启动 Paperclip 前设置 BETTER_AUTH_SECRET",
     };
   }
 
   if (auth.baseUrlMode === "explicit" && !auth.publicBaseUrl) {
     return {
-      name: "Deployment/auth mode",
+      name: "部署/认证模式",
       status: "fail",
-      message: "auth.baseUrlMode=explicit requires auth.publicBaseUrl",
+      message: "auth.baseUrlMode=explicit 需要设置 auth.publicBaseUrl",
       canRepair: false,
-      repairHint: "Run `paperclipai configure --section server` and provide a base URL",
+      repairHint: "运行 `paperclipai configure --section server` 并提供基础 URL",
     };
   }
 
   if (exposure === "public") {
     if (auth.baseUrlMode !== "explicit" || !auth.publicBaseUrl) {
       return {
-        name: "Deployment/auth mode",
+        name: "部署/认证模式",
         status: "fail",
-        message: "authenticated/public requires explicit auth.publicBaseUrl",
+        message: "公开暴露模式需要明确的 auth.publicBaseUrl",
         canRepair: false,
-        repairHint: "Run `paperclipai configure --section server` and select public exposure",
+        repairHint: "运行 `paperclipai configure --section server` 并选择公开暴露",
       };
     }
     try {
       const url = new URL(auth.publicBaseUrl);
       if (url.protocol !== "https:") {
         return {
-          name: "Deployment/auth mode",
+          name: "部署/认证模式",
           status: "warn",
-          message: "Public exposure should use an https:// auth.publicBaseUrl",
+          message: "公开暴露应使用 https:// 协议的 auth.publicBaseUrl",
           canRepair: false,
-          repairHint: "Use HTTPS in production for secure session cookies",
+          repairHint: "生产环境使用 HTTPS 以确保会话 Cookie 安全",
         };
       }
     } catch {
       return {
-        name: "Deployment/auth mode",
+        name: "部署/认证模式",
         status: "fail",
-        message: "auth.publicBaseUrl is not a valid URL",
+        message: "auth.publicBaseUrl 不是有效的 URL",
         canRepair: false,
-        repairHint: "Run `paperclipai configure --section server` and provide a valid URL",
+        repairHint: "运行 `paperclipai configure --section server` 并提供有效的 URL",
       };
     }
   }
 
   return {
-    name: "Deployment/auth mode",
+    name: "部署/认证模式",
     status: "pass",
-    message: `Mode ${mode}/${exposure} with auth URL mode ${auth.baseUrlMode}`,
+    message: `模式 ${mode}/${exposure}，认证 URL 模式 ${auth.baseUrlMode}`,
   };
 }

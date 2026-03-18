@@ -13,6 +13,7 @@ import {
   ToggleField,
   HintIcon
 } from "../components/agent-config-primitives";
+import { useTranslation } from "react-i18next";
 
 type AgentSnippetInput = {
   onboardingTextUrl: string;
@@ -29,6 +30,7 @@ export function CompanySettings() {
   } = useCompany();
   const { setBreadcrumbs } = useBreadcrumbs();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   // General settings local state
   const [companyName, setCompanyName] = useState("");
@@ -180,16 +182,16 @@ export function CompanySettings() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <div className="flex items-center gap-2">
-        <Settings className="h-5 w-5 text-muted-foreground" />
-        <h1 className="text-lg font-semibold">Company Settings</h1>
-      </div>
+       <div className="flex items-center gap-2">
+         <Settings className="h-5 w-5 text-muted-foreground" />
+         <h1 className="text-lg font-semibold">{t("company.settings")}</h1>
+       </div>
 
       {/* General */}
       <div className="space-y-4">
-        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          General
-        </div>
+         <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+           {t("company.general")}
+         </div>
         <div className="space-y-3 rounded-md border border-border px-4 py-4">
           <Field label="Company name" hint="The display name for your company.">
             <input

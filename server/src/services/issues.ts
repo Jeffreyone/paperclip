@@ -315,28 +315,31 @@ function withActiveRuns(
 }
 
 export function issueService(db: Db) {
-  async function assertAssignableAgent(companyId: string, agentId: string) {
-    const assignee = await db
-      .select({
-        id: agents.id,
-        companyId: agents.companyId,
-        status: agents.status,
-      })
-      .from(agents)
-      .where(eq(agents.id, agentId))
-      .then((rows) => rows[0] ?? null);
+   async function assertAssignableAgent(companyId: string, agentId: string) {
+     const assignee = await db
+       .select({
+         id: agents.id,
+         companyId: agents.companyId,
+         status: agents.status,
+       })
+       .from(agents)
+       .where(eq(agents.id, agentId))
+       .then((rows) => rows[0] ?? null);
 
-    if (!assignee) throw notFound("Assignee agent not found");
-    if (assignee.companyId !== companyId) {
-      throw unprocessable("Assignee must belong to same company");
-    }
-    if (assignee.status === "pending_approval") {
-      throw conflict("Cannot assign work to pending approval agents");
-    }
-    if (assignee.status === "terminated") {
-      throw conflict("Cannot assign work to terminated agents");
-    }
-  }
+     if (!assignee) throw notFound("Assignee agent not found");
+     if (assignee.companyId !== companyId) {
+       throw unprocessable("Assignee must belong to same company");
+     }
+     if (assignee.status === "pending_approval") {
+       throw conflict("Cannot assign work to pending approval agents");
+     }
+     if (assignee.status === "terminated") {
+       throw conflict("Cannot assign work to terminated agents");
+     }
+     if (assignee.status === "paused") {
+       throw conflict("Cannot assign work to paused agents (budget exhausted)");
+     }
+   }
 
   async function assertAssignableUser(companyId: string, userId: string) {
     const membership = await db

@@ -84,6 +84,108 @@ function downloadDocumentFile(key: string, body: string) {
   URL.revokeObjectURL(url);
 }
 
+function DocumentConflictAlert({
+  activeConflict,
+  docKey,
+  isPlan,
+  serverDocument,
+  upsertPending,
+  onToggleRemote,
+  onKeepDraft,
+  onReload,
+  onOverwrite,
+}: {
+  activeConflict: DocumentConflictState;
+  docKey: string;
+  isPlan: boolean;
+  serverDocument: IssueDocument;
+  upsertPending: boolean;
+  onToggleRemote: () => void;
+  onKeepDraft: () => void;
+  onReload: () => void;
+  onOverwrite: () => void;
+}) {
+  return (
+    <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-amber-200">Out of date</p>
+          <p className="text-xs text-muted-foreground">
+            This document changed while you were editing. Your local draft is preserved and autosave is paused.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={onToggleRemote}>
+            {activeConflict.showRemote ? "Hide remote" : "Review remote"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={onKeepDraft}>
+            Keep my draft
+          </Button>
+          <Button variant="outline" size="sm" onClick={onReload}>
+            Reload remote
+          </Button>
+          <Button size="sm" onClick={onOverwrite} disabled={upsertPending}>
+            {upsertPending ? "Saving..." : "Overwrite remote"}
+          </Button>
+        </div>
+      </div>
+      {activeConflict.showRemote && (
+        <div className="mt-3 rounded-md border border-border/70 bg-background/60 p-3">
+          <div className="mb-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+            <span>Remote revision {serverDocument.latestRevisionNumber}</span>
+            <span>•</span>
+            <span>updated {relativeTime(serverDocument.updatedAt)}</span>
+          </div>
+          {!isPlan && serverDocument.title ? (
+            <p className="mb-2 text-sm font-medium">{serverDocument.title}</p>
+          ) : null}
+          {renderBody(serverDocument.body, "text-[14px] leading-7")}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DocumentActionsDropdown({
+  docKey,
+  body,
+  canDelete,
+  onDelete,
+}: {
+  docKey: string;
+  body: string;
+  canDelete: boolean;
+  onDelete: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="text-muted-foreground"
+          title="Document actions"
+        >
+          <MoreHorizontal className="h-3.5 w-3.5" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => downloadDocumentFile(docKey, body)}>
+          <Download className="h-3.5 w-3.5" />
+          Download document
+        </DropdownMenuItem>
+        {canDelete ? <DropdownMenuSeparator /> : null}
+        {canDelete ? (
+          <DropdownMenuItem variant="destructive" onClick={onDelete}>
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete document
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function IssueDocumentsSection({
   issue,
   canDeleteDocuments,
@@ -673,36 +775,12 @@ export function IssueDocumentsSection({
                       <Copy className="h-3.5 w-3.5" />
                     )}
                   </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        className="text-muted-foreground"
-                        title="Document actions"
-                      >
-                        <MoreHorizontal className="h-3.5 w-3.5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => downloadDocumentFile(doc.key, activeDraft?.body ?? doc.body)}
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        Download document
-                      </DropdownMenuItem>
-                      {canDeleteDocuments ? <DropdownMenuSeparator /> : null}
-                      {canDeleteDocuments ? (
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onClick={() => setConfirmDeleteKey(doc.key)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Delete document
-                        </DropdownMenuItem>
-                      ) : null}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <DocumentActionsDropdown
+                    docKey={doc.key}
+                    body={activeDraft?.body ?? doc.body}
+                    canDelete={canDeleteDocuments}
+                    onDelete={() => setConfirmDeleteKey(doc.key)}
+                  />
                 </div>
               </div>
 
@@ -724,67 +802,25 @@ export function IssueDocumentsSection({
                       await handleDraftKeyDown(event);
                     }
                   }}
-                >
+                  >
                   {activeConflict && (
-                    <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-3">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium text-amber-200">Out of date</p>
-                          <p className="text-xs text-muted-foreground">
-                            This document changed while you were editing. Your local draft is preserved and autosave is paused.
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              setDocumentConflict((current) =>
-                                current?.key === doc.key
-                                  ? { ...current, showRemote: !current.showRemote }
-                                  : current,
-                              )
-                            }
-                          >
-                            {activeConflict.showRemote ? "Hide remote" : "Review remote"}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => keepConflictedDraft(doc.key)}
-                          >
-                            Keep my draft
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => reloadDocumentFromServer(doc.key)}
-                          >
-                            Reload remote
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => void overwriteDocumentFromDraft(doc.key)}
-                            disabled={upsertDocument.isPending}
-                          >
-                            {upsertDocument.isPending ? "Saving..." : "Overwrite remote"}
-                          </Button>
-                        </div>
-                      </div>
-                      {activeConflict.showRemote && (
-                        <div className="mt-3 rounded-md border border-border/70 bg-background/60 p-3">
-                          <div className="mb-2 flex items-center gap-2 text-[11px] text-muted-foreground">
-                            <span>Remote revision {activeConflict.serverDocument.latestRevisionNumber}</span>
-                            <span>•</span>
-                            <span>updated {relativeTime(activeConflict.serverDocument.updatedAt)}</span>
-                          </div>
-                          {!isPlanKey(doc.key) && activeConflict.serverDocument.title ? (
-                            <p className="mb-2 text-sm font-medium">{activeConflict.serverDocument.title}</p>
-                          ) : null}
-                          {renderBody(activeConflict.serverDocument.body, "text-[14px] leading-7")}
-                        </div>
-                      )}
-                    </div>
+                    <DocumentConflictAlert
+                      activeConflict={activeConflict}
+                      docKey={doc.key}
+                      isPlan={isPlanKey(doc.key)}
+                      serverDocument={activeConflict.serverDocument}
+                      upsertPending={upsertDocument.isPending}
+                      onToggleRemote={() =>
+                        setDocumentConflict((current) =>
+                          current?.key === doc.key
+                            ? { ...current, showRemote: !current.showRemote }
+                            : current,
+                        )
+                      }
+                      onKeepDraft={() => keepConflictedDraft(doc.key)}
+                      onReload={() => reloadDocumentFromServer(doc.key)}
+                      onOverwrite={() => void overwriteDocumentFromDraft(doc.key)}
+                    />
                   )}
                   {activeDraft && !isPlanKey(doc.key) && (
                     <Input

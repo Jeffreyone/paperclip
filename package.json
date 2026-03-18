@@ -26,6 +26,8 @@
     "changeset": "changeset",
     "version-packages": "changeset version",
     "check:tokens": "node scripts/check-forbidden-tokens.mjs",
+    "analyze": "pnpm paperclipai analyze . --no-complexity --no-type-safety",
+    "analyze:i18n": "pnpm paperclipai analyze . --no-complexity --no-type-safety -s",
     "docs:dev": "cd docs && npx mintlify dev",
     "smoke:openclaw-join": "./scripts/smoke/openclaw-join.sh",
     "smoke:openclaw-docker-ui": "./scripts/smoke/openclaw-docker-ui.sh",
@@ -35,8 +37,9 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.30.0",
-    "cross-env": "^10.1.0",
     "@playwright/test": "^1.58.2",
+    "@vitest/coverage-v8": "3.2.4",
+    "cross-env": "^10.1.0",
     "esbuild": "^0.27.3",
     "typescript": "^5.7.3",
     "vitest": "^3.0.5"
@@ -44,5 +47,8 @@
   "engines": {
     "node": ">=20"
   },
-  "packageManager": "pnpm@9.15.4"
+  "packageManager": "pnpm@9.15.4",
+  "dependencies": {
+    "zod": "^3.24.2"
+  }
 }

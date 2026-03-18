@@ -35,6 +35,9 @@ jobs:
       - name: Typecheck
         run: pnpm -r typecheck
 
+      - name: i18n Check
+        run: pnpm paperclipai analyze .
+
       - name: Run tests
         run: pnpm test:run
 

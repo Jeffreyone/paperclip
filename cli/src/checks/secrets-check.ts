@@ -38,10 +38,10 @@ function withStrictModeNote(
   return {
     ...base,
     status: "warn",
-    message: `${base.message}; strict secret mode is disabled for postgres deployment`,
+    message: `${base.message}；PostgreSQL 部署已禁用严格密钥模式`,
     repairHint: base.repairHint
-      ? `${base.repairHint}. Consider enabling secrets.strictMode`
-      : "Consider enabling secrets.strictMode",
+      ? `${base.repairHint}。建议启用 secrets.strictMode`
+      : "建议启用 secrets.strictMode",
   };
 }
 
@@ -49,11 +49,11 @@ export function secretsCheck(config: PaperclipConfig, configPath?: string): Chec
   const provider = config.secrets.provider;
   if (provider !== "local_encrypted") {
     return {
-      name: "Secrets adapter",
+      name: "密钥适配器",
       status: "fail",
-      message: `${provider} is configured, but this build only supports local_encrypted`,
+      message: `已配置 ${provider}，但当前版本仅支持 local_encrypted`,
       canRepair: false,
-      repairHint: "Run `paperclipai configure --section secrets` and set provider to local_encrypted",
+      repairHint: "运行 `paperclipai configure --section secrets` 并将 provider 设置为 local_encrypted",
     };
   }
 
@@ -61,20 +61,20 @@ export function secretsCheck(config: PaperclipConfig, configPath?: string): Chec
   if (envMasterKey && envMasterKey.trim().length > 0) {
     if (!decodeMasterKey(envMasterKey)) {
       return {
-        name: "Secrets adapter",
+        name: "密钥适配器",
         status: "fail",
         message:
-          "PAPERCLIP_SECRETS_MASTER_KEY is invalid (expected 32-byte base64, 64-char hex, or raw 32-char string)",
+          "PAPERCLIP_SECRETS_MASTER_KEY 无效（应为 32 字节 base64、64 字符 hex 或 32 字符原始字符串）",
         canRepair: false,
-        repairHint: "Set PAPERCLIP_SECRETS_MASTER_KEY to a valid key or unset it to use a key file",
+        repairHint: "设置有效的 PAPERCLIP_SECRETS_MASTER_KEY 或取消设置以使用密钥文件",
       };
     }
 
     return withStrictModeNote(
       {
-        name: "Secrets adapter",
+        name: "密钥适配器",
         status: "pass",
-        message: "Local encrypted provider configured via PAPERCLIP_SECRETS_MASTER_KEY",
+        message: "本地加密密钥已通过 PAPERCLIP_SECRETS_MASTER_KEY 配置",
       },
       config,
     );
@@ -90,9 +90,9 @@ export function secretsCheck(config: PaperclipConfig, configPath?: string): Chec
   if (!fs.existsSync(keyFilePath)) {
     return withStrictModeNote(
       {
-        name: "Secrets adapter",
+        name: "密钥适配器",
         status: "warn",
-        message: `Secrets key file does not exist yet: ${keyFilePath}`,
+        message: `密钥文件尚不存在：${keyFilePath}`,
         canRepair: true,
         repair: () => {
           fs.mkdirSync(path.dirname(keyFilePath), { recursive: true });
@@ -106,7 +106,7 @@ export function secretsCheck(config: PaperclipConfig, configPath?: string): Chec
             // best effort
           }
         },
-        repairHint: "Run with --repair to create a local encrypted secrets key file",
+        repairHint: "使用 --repair 运行以创建本地加密密钥文件",
       },
       config,
     );
@@ -117,29 +117,29 @@ export function secretsCheck(config: PaperclipConfig, configPath?: string): Chec
     raw = fs.readFileSync(keyFilePath, "utf8");
   } catch (err) {
     return {
-      name: "Secrets adapter",
+      name: "密钥适配器",
       status: "fail",
-      message: `Could not read secrets key file: ${err instanceof Error ? err.message : String(err)}`,
+      message: `无法读取密钥文件：${err instanceof Error ? err.message : String(err)}`,
       canRepair: false,
-      repairHint: "Check file permissions or set PAPERCLIP_SECRETS_MASTER_KEY",
+      repairHint: "检查文件权限或设置 PAPERCLIP_SECRETS_MASTER_KEY",
     };
   }
 
   if (!decodeMasterKey(raw)) {
     return {
-      name: "Secrets adapter",
+      name: "密钥适配器",
       status: "fail",
-      message: `Invalid key material in ${keyFilePath}`,
+      message: `${keyFilePath} 中的密钥材料无效`,
       canRepair: false,
-      repairHint: "Replace with valid key material or delete it and run doctor --repair",
+      repairHint: "替换为有效的密钥材料或删除后运行 doctor --repair",
     };
   }
 
   return withStrictModeNote(
     {
-      name: "Secrets adapter",
+      name: "密钥适配器",
       status: "pass",
-      message: `Local encrypted provider configured with key file ${keyFilePath}`,
+      message: `本地加密密钥已配置，使用密钥文件 ${keyFilePath}`,
     },
     config,
   );

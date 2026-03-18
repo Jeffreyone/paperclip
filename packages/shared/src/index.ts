@@ -375,3 +375,12 @@ export {
   type SecretsLocalEncryptedConfig,
   type ConfigMeta,
 } from "./config-schema.js";
+
+export {
+  LANGUAGE_CODES,
+  SUPPORTED_LANGUAGES,
+  DEFAULT_LANGUAGE,
+  LANGUAGE_NAMES,
+  LANGUAGE_STORAGE_KEY,
+  type LanguageCode,
+} from "./i18n/index.js";

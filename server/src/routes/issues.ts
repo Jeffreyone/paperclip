@@ -24,6 +24,7 @@ import {
   documentService,
   logActivity,
   projectService,
+  approvalService,
 } from "../services/index.js";
 import { logger } from "../middleware/logger.js";
 import { forbidden, HttpError, unauthorized } from "../errors.js";
@@ -32,6 +33,8 @@ import { shouldWakeAssigneeOnCheckout } from "./issues-checkout-wakeup.js";
 import { isAllowedContentType, MAX_ATTACHMENT_BYTES } from "../attachment-types.js";
 
 const MAX_ISSUE_COMMENT_LIMIT = 500;
+
+const ACTIVE_EXECUTION_STATUSES = new Set(["todo", "in_progress", "in_review", "blocked"]);
 
 export function issueRoutes(db: Db, storage: StorageService) {
   const router = Router();
@@ -43,6 +46,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
   const goalsSvc = goalService(db);
   const issueApprovalsSvc = issueApprovalService(db);
   const documentsSvc = documentService(db);
+  const approvalsSvc = approvalService(db);
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: MAX_ATTACHMENT_BYTES, files: 1 },
@@ -646,6 +650,21 @@ export function issueRoutes(db: Db, storage: StorageService) {
     }
 
     const actor = getActorInfo(req);
+
+    if (actor.actorType === "agent" && actor.agentId) {
+      const actorAgent = await agentsSvc.getById(actor.agentId);
+      if (actorAgent?.role === "ceo") {
+        const hasStrategyApproval = await approvalsSvc.hasApprovedCeoStrategy(companyId);
+        const requestedStatus = req.body.status ?? "backlog";
+        if (!hasStrategyApproval && ACTIVE_EXECUTION_STATUSES.has(requestedStatus)) {
+          res.status(403).json({
+            error: "CEO must have approved strategy before creating tasks in active execution states",
+          });
+          return;
+        }
+      }
+    }
+
     const issue = await svc.create(companyId, {
       ...req.body,
       createdByAgentId: actor.agentId,
@@ -708,6 +727,26 @@ export function issueRoutes(db: Db, storage: StorageService) {
       }
     }
     if (!(await assertAgentRunCheckoutOwnership(req, res, existing))) return;
+
+    const newStatus = req.body.status;
+    if (newStatus !== undefined && newStatus !== existing.status) {
+      const actor = getActorInfo(req);
+      const isTransitioningToActive =
+        !ACTIVE_EXECUTION_STATUSES.has(existing.status) && ACTIVE_EXECUTION_STATUSES.has(newStatus);
+
+      if (isTransitioningToActive && actor.actorType === "agent" && actor.agentId) {
+        const actorAgent = await agentsSvc.getById(actor.agentId);
+        if (actorAgent?.role === "ceo") {
+          const hasStrategyApproval = await approvalsSvc.hasApprovedCeoStrategy(existing.companyId);
+          if (!hasStrategyApproval) {
+            res.status(403).json({
+              error: "CEO must have approved strategy before transitioning tasks to active execution states",
+            });
+            return;
+          }
+        }
+      }
+    }
 
     const { comment: commentBody, hiddenAt: hiddenAtRaw, ...updateFields } = req.body;
     if (hiddenAtRaw !== undefined) {

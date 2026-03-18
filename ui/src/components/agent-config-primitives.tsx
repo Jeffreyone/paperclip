@@ -16,8 +16,59 @@ import { Button } from "@/components/ui/button";
 import { HelpCircle, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "../lib/utils";
 import { AGENT_ROLE_LABELS } from "@paperclipai/shared";
+import { useTranslation } from "react-i18next";
 
-/* ---- Help text for (?) tooltips ---- */
+const helpKeys = [
+  "name",
+  "title",
+  "role",
+  "reportsTo",
+  "capabilities",
+  "adapterType",
+  "cwd",
+  "promptTemplate",
+  "model",
+  "thinkingEffort",
+  "chrome",
+  "dangerouslySkipPermissions",
+  "dangerouslyBypassSandbox",
+  "search",
+  "workspaceStrategy",
+  "workspaceBaseRef",
+  "workspaceBranchTemplate",
+  "worktreeParentDir",
+  "runtimeServicesJson",
+  "maxTurnsPerRun",
+  "command",
+  "localCommand",
+  "args",
+  "extraArgs",
+  "envVars",
+  "bootstrapPrompt",
+  "payloadTemplateJson",
+  "webhookUrl",
+  "heartbeatInterval",
+  "instructionsFilePath",
+  "intervalSec",
+  "timeoutSec",
+  "graceSec",
+  "wakeOnDemand",
+  "cooldownSec",
+  "maxConcurrentRuns",
+  "budgetMonthlyCents",
+] as const;
+
+export function useAdapterHelp() {
+  const { t } = useTranslation();
+  
+  const help: Record<string, string> = {};
+  for (const key of helpKeys) {
+    help[key] = t(`adapter.${key}`);
+  }
+  
+  return help;
+}
+
 export const help: Record<string, string> = {
   name: "Display name for this agent.",
   title: "Job title shown in the org chart.",

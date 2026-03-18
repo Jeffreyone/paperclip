@@ -61,6 +61,24 @@ export function costService(db: Db) {
           .update(agents)
           .set({ status: "paused", updatedAt: new Date() })
           .where(eq(agents.id, updatedAgent.id));
+        
+        // Log activity for agent pause due to budget exhaustion (SPEC 664)
+        await db
+          .insert(activityLog)
+          .values({
+            companyId,
+            actorType: "system",
+            actorId: "system",
+            action: "agent_paused_budget_exhausted",
+            entityType: "agent",
+            entityId: updatedAgent.id,
+            details: {
+              agentId: updatedAgent.id,
+              agentName: updatedAgent.name,
+              spentMonthlyCents: updatedAgent.spentMonthlyCents,
+              budgetMonthlyCents: updatedAgent.budgetMonthlyCents
+            }
+          });
       }
 
       return event;

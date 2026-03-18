@@ -226,7 +226,12 @@ pnpm typecheck        # Type checking
 pnpm test:run         # Run tests
 pnpm db:generate      # Generate DB migration
 pnpm db:migrate       # Apply migrations
+pnpm analyze:i18n     # Run i18n hardcoded string detection
 ```
+
+### Internationalization (i18n)
+
+Paperclip supports multiple languages (English and Simplified Chinese). See [doc/I18N.md](doc/I18N.md) for contribution guidelines.
 
 See [doc/DEVELOPING.md](doc/DEVELOPING.md) for the full development guide.
 

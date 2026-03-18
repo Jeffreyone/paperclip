@@ -19,6 +19,7 @@ import { applyDataDirOverride, type DataDirOptionLike } from "./config/data-dir.
 import { loadPaperclipEnvFile } from "./config/env.js";
 import { registerWorktreeCommands } from "./commands/worktree.js";
 import { registerPluginCommands } from "./commands/client/plugin.js";
+import { analyzeCommand } from "./commands/code-analyze.js";
 
 const program = new Command();
 const DATA_DIR_OPTION_HELP =
@@ -138,6 +139,23 @@ registerActivityCommands(program);
 registerDashboardCommands(program);
 registerWorktreeCommands(program);
 registerPluginCommands(program);
+
+program
+  .command("analyze")
+  .description("分析代码质量指标（文件大小、复杂度、类型安全、中文化）")
+  .argument("[path]", "要分析的目录路径（默认当前目录）")
+  .option("-o, --output <path>", "输出文件路径（JSON 格式）")
+  .option("-t, --file-size-threshold <lines>", "文件大小阈值（行数，默认 1500）", "1500")
+  .option("--include <exts>", "包含的文件扩展名（逗号分隔）")
+  .option("--exclude <dirs>", "排除的目录（逗号分隔）")
+  .option("--no-complexity", "跳过复杂度分析")
+  .option("--no-type-safety", "跳过类型安全分析")
+  .option("--no-i18n", "跳过中文化分析")
+  .option("-v, --verbose", "详细输出")
+  .option("-s, --summary", "仅输出摘要")
+  .action(async (path, opts) => {
+    await analyzeCommand({ path, ...opts });
+  });
 
 const auth = program.command("auth").description("Authentication and bootstrap utilities");
 

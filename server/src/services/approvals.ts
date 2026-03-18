@@ -246,5 +246,24 @@ export function approvalService(db: Db) {
         .returning()
         .then((rows) => redactApprovalComment(rows[0]));
     },
+
+    /**
+     * Check if company has an approved CEO strategy approval.
+     * Returns true if at least one approve_ceo_strategy approval with status "approved" exists.
+     */
+    hasApprovedCeoStrategy: async (companyId: string): Promise<boolean> => {
+       const result = await db
+         .select({ id: approvals.id })
+         .from(approvals)
+         .where(
+           and(
+             eq(approvals.companyId, companyId),
+             eq(approvals.type, "approve_ceo_strategy"),
+             eq(approvals.status, "approved"),
+           )
+         )
+         .limit(1);
+       return result.length > 0;
+     },
   };
 }

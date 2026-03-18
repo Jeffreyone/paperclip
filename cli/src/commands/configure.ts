@@ -20,12 +20,12 @@ import { printPaperclipCliBanner } from "../utils/banner.js";
 type Section = "llm" | "database" | "logging" | "server" | "storage" | "secrets";
 
 const SECTION_LABELS: Record<Section, string> = {
-  llm: "LLM Provider",
-  database: "Database",
-  logging: "Logging",
-  server: "Server",
-  storage: "Storage",
-  secrets: "Secrets",
+  llm: "LLM 提供商",
+  database: "数据库",
+  logging: "日志",
+  server: "服务器",
+  storage: "存储",
+  secrets: "密钥",
 };
 
 function defaultConfig(): PaperclipConfig {
@@ -77,7 +77,7 @@ export async function configure(opts: {
   const configPath = resolveConfigPath(opts.config);
 
   if (!configExists(opts.config)) {
-    p.log.error("No config file found. Run `paperclipai onboard` first.");
+    p.log.error("未找到配置文件。请先运行 `paperclipai onboard`。");
     p.outro("");
     return;
   }
@@ -88,7 +88,7 @@ export async function configure(opts: {
   } catch (err) {
     p.log.message(
       pc.yellow(
-        `Existing config is invalid. Loading defaults so you can repair it now.\n${err instanceof Error ? err.message : String(err)}`,
+        `现有配置无效。加载默认配置以便您可以修复。\n${err instanceof Error ? err.message : String(err)}`,
       ),
     );
     config = defaultConfig();
@@ -97,7 +97,7 @@ export async function configure(opts: {
   let section: Section | undefined = opts.section as Section | undefined;
 
   if (section && !SECTION_LABELS[section]) {
-    p.log.error(`Unknown section: ${section}. Choose from: ${Object.keys(SECTION_LABELS).join(", ")}`);
+    p.log.error(`未知配置节：${section}。可选值：${Object.keys(SECTION_LABELS).join(", ")}`);
     p.outro("");
     return;
   }
@@ -107,7 +107,7 @@ export async function configure(opts: {
   while (continueLoop) {
     if (!section) {
       const choice = await p.select({
-        message: "Which section do you want to configure?",
+        message: "请选择要配置的部分：",
         options: Object.entries(SECTION_LABELS).map(([value, label]) => ({
           value: value as Section,
           label,
@@ -115,7 +115,7 @@ export async function configure(opts: {
       });
 
       if (p.isCancel(choice)) {
-        p.cancel("Configuration cancelled.");
+        p.cancel("配置已取消。");
         return;
       }
 
@@ -158,13 +158,13 @@ export async function configure(opts: {
         {
           const keyResult = ensureLocalSecretsKeyFile(config, configPath);
           if (keyResult.status === "created") {
-            p.log.success(`Created local secrets key file at ${pc.dim(keyResult.path)}`);
+            p.log.success(`已创建本地密钥文件：${pc.dim(keyResult.path)}`);
           } else if (keyResult.status === "existing") {
-            p.log.message(pc.dim(`Using existing local secrets key file at ${keyResult.path}`));
+            p.log.message(pc.dim(`使用现有本地密钥文件：${keyResult.path}`));
           } else if (keyResult.status === "skipped_provider") {
-            p.log.message(pc.dim("Skipping local key file management for non-local provider"));
+            p.log.message(pc.dim("跳过本地密钥文件管理（非本地提供商）"));
           } else {
-            p.log.message(pc.dim("Skipping local key file management because PAPERCLIP_SECRETS_MASTER_KEY is set"));
+            p.log.message(pc.dim("跳过本地密钥文件管理（已设置 PAPERCLIP_SECRETS_MASTER_KEY）"));
           }
         }
         break;
@@ -174,14 +174,14 @@ export async function configure(opts: {
     config.$meta.source = "configure";
 
     writeConfig(config, opts.config);
-    p.log.success(`${SECTION_LABELS[section]} configuration updated.`);
+    p.log.success(`${SECTION_LABELS[section]} 配置已更新。`);
 
     // If section was provided via CLI flag, don't loop
     if (opts.section) {
       continueLoop = false;
     } else {
       const another = await p.confirm({
-        message: "Configure another section?",
+        message: "是否配置其他部分？",
         initialValue: false,
       });
 
@@ -193,5 +193,5 @@ export async function configure(opts: {
     }
   }
 
-  p.outro("Configuration saved.");
+  p.outro("配置已保存。");
 }

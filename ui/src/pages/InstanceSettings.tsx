@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clock3, ExternalLink, Settings } from "lucide-react";
 import type { InstanceSchedulerHeartbeatAgent } from "@paperclipai/shared";
@@ -27,19 +28,20 @@ function buildAgentHref(agent: InstanceSchedulerHeartbeatAgent) {
 }
 
 export function InstanceSettings() {
+  const { t } = useTranslation();
   const { setBreadcrumbs } = useBreadcrumbs();
   const queryClient = useQueryClient();
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     setBreadcrumbs([
-      { label: "Instance Settings" },
-      { label: "Heartbeats" },
+      { label: t("instance.instanceSettings") },
+      { label: t("instance.heartbeats") },
     ]);
-  }, [setBreadcrumbs]);
+  }, [setBreadcrumbs, t]);
 
   const heartbeatsQuery = useQuery({
-    queryKey: queryKeys.instance.schedulerHeartbeats,
+    queryKey: queryKeys.instance.scheduledAgents,
     queryFn: () => heartbeatsApi.listInstanceSchedulerAgents(),
     refetchInterval: 15_000,
   });
@@ -67,13 +69,13 @@ export function InstanceSettings() {
     onSuccess: async (_, agentRow) => {
       setActionError(null);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.instance.schedulerHeartbeats }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.instance.scheduledAgents }),
         queryClient.invalidateQueries({ queryKey: queryKeys.agents.list(agentRow.companyId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.agents.detail(agentRow.id) }),
       ]);
     },
     onError: (error) => {
-      setActionError(error instanceof Error ? error.message : "Failed to update heartbeat.");
+      setActionError(error instanceof Error ? error.message : t("instance.failedToUpdateHeartbeat"));
     },
   });
 
@@ -95,7 +97,7 @@ export function InstanceSettings() {
   }, [agents]);
 
   if (heartbeatsQuery.isLoading) {
-    return <div className="text-sm text-muted-foreground">Loading scheduler heartbeats...</div>;
+    return <div className="text-sm text-muted-foreground">{t("instance.loadingScheduledAgents")}</div>;
   }
 
   if (heartbeatsQuery.error) {
@@ -103,7 +105,7 @@ export function InstanceSettings() {
       <div className="text-sm text-destructive">
         {heartbeatsQuery.error instanceof Error
           ? heartbeatsQuery.error.message
-          : "Failed to load scheduler heartbeats."}
+          : t("instance.failedToLoadScheduledAgents")}
       </div>
     );
   }
@@ -113,17 +115,17 @@ export function InstanceSettings() {
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <Settings className="h-5 w-5 text-muted-foreground" />
-          <h1 className="text-lg font-semibold">Scheduler Heartbeats</h1>
+          <h1 className="text-lg font-semibold">{t("instance.scheduledAgents")}</h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          Agents with a timer heartbeat enabled across all of your companies.
+          {t("instance.scheduledAgentsDescription")}
         </p>
       </div>
 
       <div className="flex gap-4 text-sm text-muted-foreground">
-        <span><span className="font-semibold text-foreground">{activeCount}</span> active</span>
-        <span><span className="font-semibold text-foreground">{disabledCount}</span> disabled</span>
-        <span><span className="font-semibold text-foreground">{grouped.length}</span> {grouped.length === 1 ? "company" : "companies"}</span>
+        <span><span className="font-semibold text-foreground">{activeCount}</span> {t("instance.active")}</span>
+        <span><span className="font-semibold text-foreground">{disabledCount}</span> {t("instance.disabled")}</span>
+        <span><span className="font-semibold text-foreground">{grouped.length}</span> {grouped.length === 1 ? t("instance.company") : t("instance.companies")}</span>
       </div>
 
       {actionError && (
@@ -135,7 +137,7 @@ export function InstanceSettings() {
       {agents.length === 0 ? (
         <EmptyState
           icon={Clock3}
-          message="No scheduler heartbeats match the current criteria."
+          message={t("instance.noScheduledAgents")}
         />
       ) : (
         <div className="space-y-4">
@@ -157,7 +159,7 @@ export function InstanceSettings() {
                           variant={agent.schedulerActive ? "default" : "outline"}
                           className="shrink-0 text-[10px] px-1.5 py-0"
                         >
-                          {agent.schedulerActive ? "On" : "Off"}
+                          {agent.schedulerActive ? t("instance.on") : t("instance.off")}
                         </Badge>
                         <Link
                           to={buildAgentHref(agent)}
@@ -177,13 +179,13 @@ export function InstanceSettings() {
                         >
                           {agent.lastHeartbeatAt
                             ? relativeTime(agent.lastHeartbeatAt)
-                            : "never"}
+                            : t("common.never")}
                         </span>
                         <span className="ml-auto flex items-center gap-1.5 shrink-0">
                           <Link
                             to={buildAgentHref(agent)}
                             className="text-muted-foreground hover:text-foreground"
-                            title="Full agent config"
+                            title={t("instance.fullAgentConfig")}
                           >
                             <ExternalLink className="h-3.5 w-3.5" />
                           </Link>
@@ -194,7 +196,7 @@ export function InstanceSettings() {
                             disabled={saving}
                             onClick={() => toggleMutation.mutate(agent)}
                           >
-                            {saving ? "..." : agent.heartbeatEnabled ? "Disable Timer Heartbeat" : "Enable Timer Heartbeat"}
+                            {saving ? t("instance.saving") : agent.heartbeatEnabled ? t("instance.disableTimerHeartbeat") : t("instance.enableTimerHeartbeat")}
                           </Button>
                         </span>
                       </div>
