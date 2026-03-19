@@ -1,5 +1,6 @@
 import type {
   AgentAdapterType,
+  AgentContextMode,
   AgentRole,
   AgentStatus,
 } from "../constants.js";
@@ -20,6 +21,7 @@ export interface Agent {
   reportsTo: string | null;
   capabilities: string | null;
   adapterType: AgentAdapterType;
+  contextMode: AgentContextMode;
   adapterConfig: Record<string, unknown>;
   runtimeConfig: Record<string, unknown>;
   budgetMonthlyCents: number;

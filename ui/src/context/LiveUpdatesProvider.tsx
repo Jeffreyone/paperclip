@@ -125,7 +125,7 @@ function resolveIssueToastContext(
   };
 }
 
-const ISSUE_TOAST_ACTIONS = new Set(["issue.created", "issue.updated", "issue.comment_added"]);
+const ISSUE_TOAST_ACTIONS = new Set(["issue.created", "issue.updated", "issue.comment_added", "issue.checked_out", "issue.released"]);
 const AGENT_TOAST_STATUSES = new Set(["running", "error"]);
 const TERMINAL_RUN_STATUSES = new Set(["succeeded", "failed", "timed_out", "cancelled"]);
 
@@ -199,6 +199,26 @@ function buildActivityToast(
     return {
       title: `${actor} updated ${issue.ref}`,
       body: truncate(body, 100),
+      tone: "info",
+      action: { label: `View ${issue.ref}`, href: issue.href },
+      dedupeKey: `activity:${action}:${entityId}`,
+    };
+  }
+
+  if (action === "issue.checked_out") {
+    return {
+      title: `${actor} claimed ${issue.ref}`,
+      body: issue.title ? truncate(issue.title, 96) : undefined,
+      tone: "warn",
+      action: { label: `View ${issue.ref}`, href: issue.href },
+      dedupeKey: `activity:${action}:${entityId}`,
+    };
+  }
+
+  if (action === "issue.released") {
+    return {
+      title: `${actor} released ${issue.ref}`,
+      body: issue.title ? truncate(issue.title, 96) : undefined,
       tone: "info",
       action: { label: `View ${issue.ref}`, href: issue.href },
       dedupeKey: `activity:${action}:${entityId}`,

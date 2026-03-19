@@ -354,6 +354,7 @@ export function agentRoutes(db: Db) {
       status: agent.status,
       reportsTo: agent.reportsTo,
       adapterType: agent.adapterType,
+      contextMode: agent.contextMode,
       adapterConfig: redactEventPayload(agent.adapterConfig),
       runtimeConfig: redactEventPayload(agent.runtimeConfig),
       permissions: agent.permissions,
@@ -1275,6 +1276,15 @@ export function agentRoutes(db: Db) {
       res.status(404).json({ error: "Key not found" });
       return;
     }
+    await logActivity(db, {
+      companyId: revoked.companyId,
+      actorType: "user",
+      actorId: req.actor.userId ?? "board",
+      action: "agent.key_revoked",
+      entityType: "agent",
+      entityId: revoked.agentId,
+      details: { keyId: revoked.id, name: revoked.name },
+    });
     res.json({ ok: true });
   });
 

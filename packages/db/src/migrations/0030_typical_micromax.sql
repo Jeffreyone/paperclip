@@ -1,0 +1,1 @@
+ALTER TABLE "agents" ADD COLUMN "context_mode" text DEFAULT 'thin' NOT NULL;

@@ -33,4 +33,7 @@ export interface CostByAgent {
   subscriptionRunCount: number;
   subscriptionInputTokens: number;
   subscriptionOutputTokens: number;
+  budgetMonthlyCents: number;
+  spentMonthlyCents: number;
+  utilizationPercent: number;
 }

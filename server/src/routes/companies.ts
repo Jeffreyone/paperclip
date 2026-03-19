@@ -65,7 +65,22 @@ export function companyRoutes(db: Db) {
   router.post("/:companyId/export", validate(companyPortabilityExportSchema), async (req, res) => {
     const companyId = req.params.companyId as string;
     assertCompanyAccess(req, companyId);
+    const actor = getActorInfo(req);
     const result = await portability.exportBundle(companyId, req.body);
+    await logActivity(db, {
+      companyId,
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      action: "company.exported",
+      entityType: "company",
+      entityId: companyId,
+      agentId: actor.agentId,
+      runId: actor.runId,
+      details: {
+        include: req.body.include ?? null,
+        warningCount: result.warnings.length,
+      },
+    });
     res.json(result);
   });
 
@@ -170,11 +185,23 @@ export function companyRoutes(db: Db) {
     assertBoard(req);
     const companyId = req.params.companyId as string;
     assertCompanyAccess(req, companyId);
+    const actor = getActorInfo(req);
     const company = await svc.remove(companyId);
     if (!company) {
       res.status(404).json({ error: "Company not found" });
       return;
     }
+    await logActivity(db, {
+      companyId,
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      action: "company.deleted",
+      entityType: "company",
+      entityId: companyId,
+      agentId: actor.agentId,
+      runId: actor.runId,
+      details: { name: company.name },
+    });
     res.json({ ok: true });
   });
 

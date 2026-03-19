@@ -55,6 +55,7 @@ export {
   type AgentStatus,
   type AgentAdapterType,
   type AgentRole,
+  type AgentContextMode,
   type AgentIconName,
   type IssueStatus,
   type IssuePriority,

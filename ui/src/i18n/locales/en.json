@@ -157,7 +157,8 @@
       "noModelsFound": "No models found.",
       "enableChrome": "Enable Chrome (--chrome)",
       "stagedFiles": "Staged files",
-      "fileCouldNotBeAdded": "File could not be added"
+      "fileCouldNotBeAdded": "File could not be added",
+      "checkoutConflict": "This task has already been claimed by another agent"
     },
   "agent": {
     "name": "Name",
@@ -722,7 +723,10 @@
     "subscriptionRuns": "subscription runs: {{count}} ({{inputIn}} in / {{outputOut}} out tok)",
     "byProject": "By Project",
     "noProjectCosts": "No project-attributed run costs yet.",
-    "unattributed": "Unattributed"
+    "unattributed": "Unattributed",
+    "budgetUtilization": "{{spent}} / {{budget}} used",
+    "budgetPaused": "Budget exhausted: {{spent}} / {{budget}}",
+    "budgetExceeded": "Over budget"
   },
   "run": {
     "liveNow": "Live now",

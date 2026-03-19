@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   AGENT_ADAPTER_TYPES,
+  AGENT_CONTEXT_MODES,
   AGENT_ICON_NAMES,
   AGENT_ROLES,
   AGENT_STATUSES,
@@ -32,6 +33,7 @@ export const createAgentSchema = z.object({
   reportsTo: z.string().uuid().optional().nullable(),
   capabilities: z.string().optional().nullable(),
   adapterType: z.enum(AGENT_ADAPTER_TYPES).optional().default("process"),
+  contextMode: z.enum(AGENT_CONTEXT_MODES).optional().default("thin"),
   adapterConfig: adapterConfigSchema.optional().default({}),
   runtimeConfig: z.record(z.unknown()).optional().default({}),
   budgetMonthlyCents: z.number().int().nonnegative().optional().default(0),
@@ -54,6 +56,7 @@ export const updateAgentSchema = createAgentSchema
   .extend({
     permissions: z.never().optional(),
     status: z.enum(AGENT_STATUSES).optional(),
+    contextMode: z.enum(AGENT_CONTEXT_MODES).optional(),
     spentMonthlyCents: z.number().int().nonnegative().optional(),
   });
 

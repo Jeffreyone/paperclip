@@ -3,7 +3,9 @@ import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate, useParams } from "@/lib/router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { issuesApi } from "../api/issues";
+import { ApiError } from "../api/client";
 import { activityApi } from "../api/activity";
+import { useToast } from "@/context/ToastContext";
 import { heartbeatsApi } from "../api/heartbeats";
 import { agentsApi } from "../api/agents";
 import { authApi } from "../api/auth";
@@ -199,6 +201,7 @@ function ActorIdentity({ evt, agentMap }: { evt: ActivityEvent; agentMap: Map<st
 
 export function IssueDetail() {
   const { t } = useTranslation();
+  const { pushToast } = useToast();
   const { issueId } = useParams<{ issueId: string }>();
   const { selectedCompanyId } = useCompany();
   const { openPanel, closePanel, panelVisible, setPanelVisible } = usePanel();
@@ -484,6 +487,29 @@ export function IssueDetail() {
     },
   });
 
+  const checkoutIssue = useMutation({
+    mutationFn: (agentId: string) => issuesApi.checkout(issueId!, agentId),
+    onSuccess: () => {
+      invalidateIssue();
+    },
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 409) {
+        pushToast({
+          title: t("issue.checkoutConflict"),
+          tone: "error",
+        });
+      }
+    },
+  });
+
+  const handleIssueUpdate = (data: Record<string, unknown>) => {
+    if ("assigneeAgentId" in data && data.assigneeAgentId != null) {
+      checkoutIssue.mutate(data.assigneeAgentId as string);
+    } else {
+      updateIssue.mutate(data);
+    }
+  };
+
   const addComment = useMutation({
     mutationFn: ({ body, reopen }: { body: string; reopen?: boolean }) =>
       issuesApi.addComment(issueId!, body, reopen),
@@ -591,7 +617,7 @@ export function IssueDetail() {
   useEffect(() => {
     if (issue) {
       openPanel(
-        <IssueProperties issue={issue} onUpdate={(data) => updateIssue.mutate(data)} />
+        <IssueProperties issue={issue} onUpdate={handleIssueUpdate} />
       );
     }
     return () => closePanel();
@@ -1144,7 +1170,7 @@ export function IssueDetail() {
           </SheetHeader>
           <ScrollArea className="flex-1 overflow-y-auto">
             <div className="px-4 pb-4">
-              <IssueProperties issue={issue} onUpdate={(data) => updateIssue.mutate(data)} inline />
+              <IssueProperties issue={issue} onUpdate={handleIssueUpdate} inline />
             </div>
           </ScrollArea>
         </SheetContent>

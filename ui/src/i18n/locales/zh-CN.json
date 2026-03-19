@@ -171,7 +171,8 @@
       "noModelsFound": "未找到模型",
       "searchModels": "搜索模型...",
       "stagedFiles": "暂存文件",
-      "thinkingEffort": "思考深度"
+      "thinkingEffort": "思考深度",
+      "checkoutConflict": "该任务已被其他人领取"
     },
   "filter": {
     "filters": "筛选",
@@ -761,7 +762,10 @@
     "subscriptionRuns": "订阅运行次数：{{count}}（输入 {{inputIn}} / 输出 {{outputOut}} tok）",
     "byProject": "按项目",
     "noProjectCosts": "暂无归属项目的运行费用。",
-    "unattributed": "未归因"
+    "unattributed": "未归因",
+    "budgetUtilization": "已用 {{spent}} / {{budget}}",
+    "budgetPaused": "已耗尽 {{spent}} / {{budget}}",
+    "budgetExceeded": "已超支"
   },
   "run": {
     "liveNow": "运行中",

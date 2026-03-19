@@ -2562,6 +2562,18 @@ export function accessRoutes(
         req.actor.userId ?? null
       );
       if (!updated) throw notFound("Member not found");
+      await logActivity(db, {
+        companyId,
+        actorType: req.actor.type === "agent" ? "agent" : "user",
+        actorId:
+          req.actor.type === "agent"
+            ? req.actor.agentId ?? "unknown-agent"
+            : req.actor.userId ?? "board",
+        action: "member.permissions_updated",
+        entityType: "company_membership",
+        entityId: memberId,
+        details: { grants: req.body.grants ?? [] }
+      });
       res.json(updated);
     }
   );
@@ -2572,6 +2584,20 @@ export function accessRoutes(
       await assertInstanceAdmin(req);
       const userId = req.params.userId as string;
       const result = await access.promoteInstanceAdmin(userId);
+      const userMemberships = await access.listUserCompanyAccess(userId);
+      const logCompanyId = userMemberships[0]?.companyId ?? userId;
+      await logActivity(db, {
+        companyId: logCompanyId,
+        actorType: req.actor.type === "agent" ? "agent" : "user",
+        actorId:
+          req.actor.type === "agent"
+            ? req.actor.agentId ?? "unknown-agent"
+            : req.actor.userId ?? "board",
+        action: "user.instance_admin_promoted",
+        entityType: "instance_user_role",
+        entityId: result.id,
+        details: { userId }
+      });
       res.status(201).json(result);
     }
   );
@@ -2581,8 +2607,22 @@ export function accessRoutes(
     async (req, res) => {
       await assertInstanceAdmin(req);
       const userId = req.params.userId as string;
+      const userMemberships = await access.listUserCompanyAccess(userId);
+      const logCompanyId = userMemberships[0]?.companyId ?? userId;
       const removed = await access.demoteInstanceAdmin(userId);
       if (!removed) throw notFound("Instance admin role not found");
+      await logActivity(db, {
+        companyId: logCompanyId,
+        actorType: req.actor.type === "agent" ? "agent" : "user",
+        actorId:
+          req.actor.type === "agent"
+            ? req.actor.agentId ?? "unknown-agent"
+            : req.actor.userId ?? "board",
+        action: "user.instance_admin_demoted",
+        entityType: "instance_user_role",
+        entityId: removed.id,
+        details: { userId }
+      });
       res.json(removed);
     }
   );
@@ -2600,10 +2640,21 @@ export function accessRoutes(
     async (req, res) => {
       await assertInstanceAdmin(req);
       const userId = req.params.userId as string;
-      const memberships = await access.setUserCompanyAccess(
-        userId,
-        req.body.companyIds ?? []
-      );
+      const companyIds = req.body.companyIds ?? [];
+      const memberships = await access.setUserCompanyAccess(userId, companyIds);
+      const logCompanyId = companyIds[0] ?? (await access.listUserCompanyAccess(userId))[0]?.companyId ?? userId;
+      await logActivity(db, {
+        companyId: logCompanyId,
+        actorType: req.actor.type === "agent" ? "agent" : "user",
+        actorId:
+          req.actor.type === "agent"
+            ? req.actor.agentId ?? "unknown-agent"
+            : req.actor.userId ?? "board",
+        action: "user.company_access_updated",
+        entityType: "user",
+        entityId: userId,
+        details: { userId, companyIds }
+      });
       res.json(memberships);
     }
   );

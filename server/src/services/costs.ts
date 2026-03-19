@@ -131,11 +131,13 @@ export function costService(db: Db) {
           costCents: sql<number>`coalesce(sum(${costEvents.costCents}), 0)::int`,
           inputTokens: sql<number>`coalesce(sum(${costEvents.inputTokens}), 0)::int`,
           outputTokens: sql<number>`coalesce(sum(${costEvents.outputTokens}), 0)::int`,
+          budgetMonthlyCents: agents.budgetMonthlyCents,
+          spentMonthlyCents: agents.spentMonthlyCents,
         })
         .from(costEvents)
         .leftJoin(agents, eq(costEvents.agentId, agents.id))
         .where(and(...conditions))
-        .groupBy(costEvents.agentId, agents.name, agents.status)
+        .groupBy(costEvents.agentId, agents.name, agents.status, agents.budgetMonthlyCents, agents.spentMonthlyCents)
         .orderBy(desc(sql`coalesce(sum(${costEvents.costCents}), 0)::int`));
 
       const runConditions: ReturnType<typeof eq>[] = [eq(heartbeatRuns.companyId, companyId)];
@@ -161,12 +163,23 @@ export function costService(db: Db) {
       const runRowsByAgent = new Map(runRows.map((row) => [row.agentId, row]));
       return costRows.map((row) => {
         const runRow = runRowsByAgent.get(row.agentId);
+        const budget = Number(row.budgetMonthlyCents ?? 0);
+        const spent = Number(row.spentMonthlyCents ?? 0);
+        const utilization = budget > 0 ? (spent / budget) * 100 : 0;
         return {
-          ...row,
+          agentId: row.agentId,
+          agentName: row.agentName,
+          agentStatus: row.agentStatus,
+          costCents: row.costCents,
+          inputTokens: row.inputTokens,
+          outputTokens: row.outputTokens,
           apiRunCount: runRow?.apiRunCount ?? 0,
           subscriptionRunCount: runRow?.subscriptionRunCount ?? 0,
           subscriptionInputTokens: runRow?.subscriptionInputTokens ?? 0,
           subscriptionOutputTokens: runRow?.subscriptionOutputTokens ?? 0,
+          budgetMonthlyCents: budget,
+          spentMonthlyCents: spent,
+          utilizationPercent: Number(utilization.toFixed(2)),
         };
       });
     },

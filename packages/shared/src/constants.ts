@@ -49,6 +49,9 @@ export const AGENT_ROLES = [
 ] as const;
 export type AgentRole = (typeof AGENT_ROLES)[number];
 
+export const AGENT_CONTEXT_MODES = ["thin", "fat"] as const;
+export type AgentContextMode = (typeof AGENT_CONTEXT_MODES)[number];
+
 export const AGENT_ROLE_LABELS: Record<AgentRole, string> = {
   ceo: "CEO",
   cto: "CTO",

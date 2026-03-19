@@ -181,34 +181,64 @@ export function Costs() {
                 ) : (
                   <div className="space-y-2">
                     {data.byAgent.map((row) => (
-                      <div
-                        key={row.agentId}
-                        className="flex items-start justify-between text-sm"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Identity
-                            name={row.agentName ?? row.agentId}
-                            size="sm"
-                          />
-                          {row.agentStatus === "terminated" && (
-                            <StatusBadge status="terminated" />
-                          )}
-                        </div>
-                        <div className="text-right shrink-0 ml-2 tabular-nums">
-                          <span className="font-medium block">{formatCents(row.costCents)}</span>
-                          <span className="text-xs text-muted-foreground block">
-                            {t("tokens", { input: formatTokens(row.inputTokens), output: formatTokens(row.outputTokens) })}
-                          </span>
-                          {(row.apiRunCount > 0 || row.subscriptionRunCount > 0) && (
+                      <div key={row.agentId} className="space-y-1.5">
+                        <div className="flex items-start justify-between text-sm">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Identity
+                              name={row.agentName ?? row.agentId}
+                              size="sm"
+                            />
+                            {row.agentStatus === "terminated" && (
+                              <StatusBadge status="terminated" />
+                            )}
+                            {row.agentStatus === "paused" && (
+                              <StatusBadge status="paused" />
+                            )}
+                          </div>
+                          <div className="text-right shrink-0 ml-2 tabular-nums">
+                            <span className="font-medium block">{formatCents(row.costCents)}</span>
                             <span className="text-xs text-muted-foreground block">
-                              {row.apiRunCount > 0 ? t("apiRuns", { count: row.apiRunCount }) : null}
-                              {row.apiRunCount > 0 && row.subscriptionRunCount > 0 ? " | " : null}
-                              {row.subscriptionRunCount > 0
-                                ? t("subscriptionRuns", { count: row.subscriptionRunCount, inputIn: formatTokens(row.subscriptionInputTokens), outputOut: formatTokens(row.subscriptionOutputTokens) })
-                                : null}
+                              {t("tokens", { input: formatTokens(row.inputTokens), output: formatTokens(row.outputTokens) })}
                             </span>
-                          )}
+                            {(row.apiRunCount > 0 || row.subscriptionRunCount > 0) && (
+                              <span className="text-xs text-muted-foreground block">
+                                {row.apiRunCount > 0 ? t("apiRuns", { count: row.apiRunCount }) : null}
+                                {row.apiRunCount > 0 && row.subscriptionRunCount > 0 ? " | " : null}
+                                {row.subscriptionRunCount > 0
+                                  ? t("subscriptionRuns", { count: row.subscriptionRunCount, inputIn: formatTokens(row.subscriptionInputTokens), outputOut: formatTokens(row.subscriptionOutputTokens) })
+                                  : null}
+                              </span>
+                            )}
+                          </div>
                         </div>
+                        {row.budgetMonthlyCents > 0 && (
+                          <div className="space-y-0.5">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>
+                                {row.agentStatus === "paused"
+                                  ? t("budgetPaused", { spent: formatCents(row.spentMonthlyCents), budget: formatCents(row.budgetMonthlyCents) })
+                                  : t("budgetUtilization", { spent: formatCents(row.spentMonthlyCents), budget: formatCents(row.budgetMonthlyCents) })}
+                              </span>
+                              <span>
+                                {row.utilizationPercent > 100
+                                  ? t("budgetExceeded")
+                                  : `${row.utilizationPercent}%`}
+                              </span>
+                            </div>
+                            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-[width,background-color] duration-150 ${
+                                  row.utilizationPercent >= 100
+                                    ? "bg-red-500"
+                                    : row.utilizationPercent >= 80
+                                      ? "bg-yellow-400"
+                                      : "bg-green-400"
+                                }`}
+                                style={{ width: `${Math.min(100, row.utilizationPercent)}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
