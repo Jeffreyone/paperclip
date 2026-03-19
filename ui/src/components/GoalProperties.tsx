@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "@/lib/router";
 import { useQuery } from "@tanstack/react-query";
 import type { Goal } from "@paperclipai/shared";
@@ -31,15 +32,47 @@ function label(s: string): string {
   return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function goalStatusLabel(t: (key: string) => string, status: string): string {
+  switch (status) {
+    case "planned":
+      return t("goal.statusPlanned");
+    case "active":
+      return t("goal.statusActive");
+    case "achieved":
+      return t("goal.statusAchieved");
+    case "cancelled":
+      return t("goal.statusCancelled");
+    default:
+      return label(status);
+  }
+}
+
+function goalLevelLabel(t: (key: string) => string, level: string): string {
+  switch (level) {
+    case "company":
+      return t("goal.levelCompany");
+    case "team":
+      return t("goal.levelTeam");
+    case "agent":
+      return t("goal.levelAgent");
+    case "task":
+      return t("goal.levelTask");
+    default:
+      return label(level);
+  }
+}
+
 function PickerButton({
   current,
   options,
   onChange,
+  labelFor,
   children,
 }: {
   current: string;
   options: readonly string[];
   onChange: (value: string) => void;
+  labelFor: (value: string) => string;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -62,7 +95,7 @@ function PickerButton({
               setOpen(false);
             }}
           >
-            {label(opt)}
+            {labelFor(opt)}
           </Button>
         ))}
       </PopoverContent>
@@ -71,6 +104,7 @@ function PickerButton({
 }
 
 export function GoalProperties({ goal, onUpdate }: GoalPropertiesProps) {
+  const { t } = useTranslation();
   const { selectedCompanyId } = useCompany();
 
   const { data: agents } = useQuery({
@@ -96,12 +130,13 @@ export function GoalProperties({ goal, onUpdate }: GoalPropertiesProps) {
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <PropertyRow label="Status">
+        <PropertyRow label={t("goal.status")}>
           {onUpdate ? (
             <PickerButton
               current={goal.status}
               options={GOAL_STATUSES}
               onChange={(status) => onUpdate({ status })}
+              labelFor={(value) => goalStatusLabel(t, value)}
             >
               <StatusBadge status={goal.status} />
             </PickerButton>
@@ -110,12 +145,13 @@ export function GoalProperties({ goal, onUpdate }: GoalPropertiesProps) {
           )}
         </PropertyRow>
 
-        <PropertyRow label="Level">
+        <PropertyRow label={t("goal.level")}>
           {onUpdate ? (
             <PickerButton
               current={goal.level}
               options={GOAL_LEVELS}
               onChange={(level) => onUpdate({ level })}
+              labelFor={(value) => goalLevelLabel(t, value)}
             >
               <span className="text-sm capitalize">{goal.level}</span>
             </PickerButton>
@@ -124,7 +160,7 @@ export function GoalProperties({ goal, onUpdate }: GoalPropertiesProps) {
           )}
         </PropertyRow>
 
-        <PropertyRow label="Owner">
+        <PropertyRow label={t("goal.owner")}>
           {ownerAgent ? (
             <Link
               to={agentUrl(ownerAgent)}
@@ -133,12 +169,12 @@ export function GoalProperties({ goal, onUpdate }: GoalPropertiesProps) {
               {ownerAgent.name}
             </Link>
           ) : (
-            <span className="text-sm text-muted-foreground">None</span>
+            <span className="text-sm text-muted-foreground">{t("common.none")}</span>
           )}
         </PropertyRow>
 
         {goal.parentId && (
-          <PropertyRow label="Parent Goal">
+          <PropertyRow label={t("goal.parentGoal")}>
             <Link
               to={`/goals/${goal.parentId}`}
               className="text-sm hover:underline"
@@ -152,10 +188,10 @@ export function GoalProperties({ goal, onUpdate }: GoalPropertiesProps) {
       <Separator />
 
       <div className="space-y-1">
-        <PropertyRow label="Created">
+        <PropertyRow label={t("common.created")}>
           <span className="text-sm">{formatDate(goal.createdAt)}</span>
         </PropertyRow>
-        <PropertyRow label="Updated">
+        <PropertyRow label={t("common.updated")}>
           <span className="text-sm">{formatDate(goal.updatedAt)}</span>
         </PropertyRow>
       </div>

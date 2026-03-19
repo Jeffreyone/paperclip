@@ -76,9 +76,15 @@
     "of": "的",
     "awaitingBoardReview": "等待董事会审核",
     "last14Days": "最近 14 天",
-    "noActivityYet": "暂无活动",
-    "recentTasks": "最近任务"
-  },
+      "noActivityYet": "暂无活动",
+      "recentTasks": "最近任务",
+      "auto": "自动",
+      "minimal": "最小",
+      "low": "低",
+      "medium": "中",
+      "high": "高",
+      "max": "最大"
+    },
     "nav": {
       "dashboard": "仪表盘",
       "myIssues": "我的任务",

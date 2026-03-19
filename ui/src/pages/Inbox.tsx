@@ -66,21 +66,14 @@ type SectionKey =
   | "failed_runs"
   | "alerts";
 
-const RUN_SOURCE_LABELS: Record<string, string> = {
-  timer: "Scheduled",
-  assignment: "Assignment",
-  on_demand: "Manual",
-  automation: "Automation",
-};
-
 function firstNonEmptyLine(value: string | null | undefined): string | null {
   if (!value) return null;
   const line = value.split("\n").map((chunk) => chunk.trim()).find(Boolean);
   return line ?? null;
 }
 
-function runFailureMessage(run: HeartbeatRun): string {
-  return firstNonEmptyLine(run.error) ?? firstNonEmptyLine(run.stderrExcerpt) ?? "Run exited with an error.";
+function runFailureMessage(run: HeartbeatRun, fallback: string): string {
+  return firstNonEmptyLine(run.error) ?? firstNonEmptyLine(run.stderrExcerpt) ?? fallback;
 }
 
 function readIssueIdFromRun(run: HeartbeatRun): string | null {
@@ -110,11 +103,19 @@ function FailedRunCard({
   onDismiss: () => void;
 }) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const issueId = readIssueIdFromRun(run);
   const issue = issueId ? issueById.get(issueId) ?? null : null;
-  const sourceLabel = RUN_SOURCE_LABELS[run.invocationSource] ?? "Manual";
-  const displayError = runFailureMessage(run);
+  const sourceLabel =
+    run.invocationSource === "timer"
+      ? t("inbox.runSource.timer")
+      : run.invocationSource === "assignment"
+        ? t("inbox.runSource.assignment")
+        : run.invocationSource === "automation"
+          ? t("inbox.runSource.automation")
+          : t("inbox.runSource.manual");
+  const displayError = runFailureMessage(run, t("inbox.runExitedWithError"));
 
   const retryRun = useMutation({
     mutationFn: async () => {
@@ -132,7 +133,7 @@ function FailedRunCard({
         payload,
       });
       if (!("id" in result)) {
-        throw new Error("Retry was skipped because the agent is not currently invokable.");
+        throw new Error(t("agent.retrySkipped"));
       }
       return result;
     },
@@ -150,7 +151,7 @@ function FailedRunCard({
         type="button"
         onClick={onDismiss}
         className="absolute right-2 top-2 z-10 rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover:opacity-100"
-        aria-label="Dismiss"
+        aria-label={t("common.dismiss")}
       >
         <X className="h-4 w-4" />
       </button>
@@ -168,7 +169,7 @@ function FailedRunCard({
           </Link>
         ) : (
           <span className="block text-sm text-muted-foreground">
-            {run.errorCode ? `Error code: ${run.errorCode}` : "No linked issue"}
+            {run.errorCode ? t("inbox.errorCode", { code: run.errorCode }) : t("inbox.noLinkedIssue")}
           </span>
         )}
 
@@ -181,12 +182,12 @@ function FailedRunCard({
               {linkedAgentName ? (
                 <Identity name={linkedAgentName} size="sm" />
               ) : (
-                <span className="text-sm font-medium">Agent {run.agentId.slice(0, 8)}</span>
+                <span className="text-sm font-medium">{t("inbox.agentPrefix", { id: run.agentId.slice(0, 8) })}</span>
               )}
               <StatusBadge status={run.status} />
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              {sourceLabel} run failed {timeAgo(run.createdAt)}
+              {t("inbox.runFailedAt", { source: sourceLabel, time: timeAgo(run.createdAt) })}
             </p>
           </div>
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
@@ -199,7 +200,7 @@ function FailedRunCard({
               disabled={retryRun.isPending}
             >
               <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-              {retryRun.isPending ? "Retrying…" : "Retry"}
+              {retryRun.isPending ? t("inbox.retrying") : t("inbox.retry")}
             </Button>
             <Button
               type="button"
@@ -209,7 +210,7 @@ function FailedRunCard({
               asChild
             >
               <Link to={`/agents/${run.agentId}/runs/${run.id}`}>
-                Open run
+                {t("inbox.openRun")}
                 <ArrowUpRight className="ml-1.5 h-3.5 w-3.5" />
               </Link>
             </Button>
@@ -226,7 +227,7 @@ function FailedRunCard({
 
         {retryRun.isError && (
           <div className="text-xs text-destructive">
-            {retryRun.error instanceof Error ? retryRun.error.message : "Failed to retry run"}
+            {retryRun.error instanceof Error ? retryRun.error.message : t("inbox.failedToRetryRun")}
           </div>
         )}
       </div>
@@ -398,7 +399,7 @@ export function Inbox() {
       navigate(`/approvals/${id}?resolved=approved`);
     },
     onError: (err) => {
-      setActionError(err instanceof Error ? err.message : "Failed to approve");
+      setActionError(err instanceof Error ? err.message : t("approval.failedToApprove"));
     },
   });
 
@@ -409,7 +410,7 @@ export function Inbox() {
       queryClient.invalidateQueries({ queryKey: queryKeys.approvals.list(selectedCompanyId!) });
     },
     onError: (err) => {
-      setActionError(err instanceof Error ? err.message : "Failed to reject");
+      setActionError(err instanceof Error ? err.message : t("approval.failedToReject"));
     },
   });
 
@@ -424,7 +425,7 @@ export function Inbox() {
       queryClient.invalidateQueries({ queryKey: queryKeys.companies.all });
     },
     onError: (err) => {
-      setActionError(err instanceof Error ? err.message : "Failed to approve join request");
+      setActionError(err instanceof Error ? err.message : t("inbox.failedToApproveJoinRequest"));
     },
   });
 
@@ -437,7 +438,7 @@ export function Inbox() {
       queryClient.invalidateQueries({ queryKey: queryKeys.sidebarBadges(selectedCompanyId!) });
     },
     onError: (err) => {
-      setActionError(err instanceof Error ? err.message : "Failed to reject join request");
+      setActionError(err instanceof Error ? err.message : t("inbox.failedToRejectJoinRequest"));
     },
   });
 
@@ -574,16 +575,16 @@ export function Inbox() {
           </Tabs>
 
           {canMarkAllRead && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 shrink-0"
-              onClick={() => markAllReadMutation.mutate(unreadIssueIds)}
-              disabled={markAllReadMutation.isPending}
-            >
-              {markAllReadMutation.isPending ? "Marking…" : "Mark all as read"}
-            </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 shrink-0"
+                onClick={() => markAllReadMutation.mutate(unreadIssueIds)}
+                disabled={markAllReadMutation.isPending}
+              >
+              {markAllReadMutation.isPending ? t("inbox.markingAllAsRead") : t("inbox.markAllAsRead")}
+              </Button>
           )}
         </div>
 
@@ -637,10 +638,10 @@ export function Inbox() {
           icon={InboxIcon}
           message={
             tab === "unread"
-              ? "No new inbox items."
+              ? t("inbox.noNewItems")
               : tab === "recent"
-                ? "No recent inbox items."
-                : "No inbox items match these filters."
+                ? t("inbox.noRecentItems")
+                : t("inbox.noItemsMatchFilters")
           }
         />
       )}
@@ -650,7 +651,7 @@ export function Inbox() {
           {showSeparatorBefore("approvals") && <Separator />}
           <div>
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              {tab === "unread" ? "Approvals Needing Action" : "Approvals"}
+              {tab === "unread" ? t("inbox.approvalsNeedingAction") : t("inbox.approvals")}
             </h3>
             <div className="grid gap-3">
               {approvalsToRender.map((approval) => (
@@ -678,7 +679,7 @@ export function Inbox() {
           {showSeparatorBefore("join_requests") && <Separator />}
           <div>
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Join Requests
+              {t("inbox.joinRequests")}
             </h3>
             <div className="grid gap-3">
               {joinRequests.map((joinRequest) => (
@@ -687,19 +688,19 @@ export function Inbox() {
                     <div className="space-y-1">
                       <p className="text-sm font-medium">
                         {joinRequest.requestType === "human"
-                          ? "Human join request"
-                          : `Agent join request${joinRequest.agentName ? `: ${joinRequest.agentName}` : ""}`}
+                          ? t("inbox.humanJoinRequest")
+                          : t("inbox.agentJoinRequest", { name: joinRequest.agentName ?? "" })}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        requested {timeAgo(joinRequest.createdAt)} from IP {joinRequest.requestIp}
+                        {t("inbox.requestedFromIp", { time: timeAgo(joinRequest.createdAt), ip: joinRequest.requestIp })}
                       </p>
                       {joinRequest.requestEmailSnapshot && (
                         <p className="text-xs text-muted-foreground">
-                          email: {joinRequest.requestEmailSnapshot}
+                          {t("inbox.emailLabel", { email: joinRequest.requestEmailSnapshot })}
                         </p>
                       )}
                       {joinRequest.adapterType && (
-                        <p className="text-xs text-muted-foreground">adapter: {joinRequest.adapterType}</p>
+                        <p className="text-xs text-muted-foreground">{t("inbox.adapterLabel", { adapter: joinRequest.adapterType })}</p>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
@@ -709,14 +710,14 @@ export function Inbox() {
                         disabled={approveJoinMutation.isPending || rejectJoinMutation.isPending}
                         onClick={() => rejectJoinMutation.mutate(joinRequest)}
                       >
-                        Reject
+                        {t("approval.reject")}
                       </Button>
                       <Button
                         size="sm"
                         disabled={approveJoinMutation.isPending || rejectJoinMutation.isPending}
                         onClick={() => approveJoinMutation.mutate(joinRequest)}
                       >
-                        Approve
+                        {t("approval.approve")}
                       </Button>
                     </div>
                   </div>
@@ -732,7 +733,7 @@ export function Inbox() {
           {showSeparatorBefore("failed_runs") && <Separator />}
           <div>
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Failed Runs
+              {t("inbox.failedRuns")}
             </h3>
             <div className="grid gap-3">
               {failedRuns.map((run) => (
@@ -755,7 +756,7 @@ export function Inbox() {
           {showSeparatorBefore("alerts") && <Separator />}
           <div>
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Alerts
+              {t("inbox.alerts")}
             </h3>
             <div className="divide-y divide-border border border-border">
               {showAggregateAgentError && (
@@ -767,14 +768,14 @@ export function Inbox() {
                     <AlertTriangle className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
                     <span className="text-sm">
                       <span className="font-medium">{dashboard!.agents.error}</span>{" "}
-                      {dashboard!.agents.error === 1 ? "agent has" : "agents have"} errors
+                      {dashboard!.agents.error === 1 ? t("inbox.agentHasErrors") : t("inbox.agentsHaveErrors")}
                     </span>
                   </Link>
                   <button
                     type="button"
                     onClick={() => dismiss("alert:agent-errors")}
                     className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover/alert:opacity-100"
-                    aria-label="Dismiss"
+                    aria-label={t("common.dismiss")}
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -788,16 +789,14 @@ export function Inbox() {
                   >
                     <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-400" />
                     <span className="text-sm">
-                      Budget at{" "}
-                      <span className="font-medium">{dashboard!.costs.monthUtilizationPercent}%</span>{" "}
-                      utilization this month
+                      {t("inbox.budgetAtUtilization", { percent: dashboard!.costs.monthUtilizationPercent })}
                     </span>
                   </Link>
                   <button
                     type="button"
                     onClick={() => dismiss("alert:budget")}
                     className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover/alert:opacity-100"
-                    aria-label="Dismiss"
+                    aria-label={t("common.dismiss")}
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -838,8 +837,8 @@ export function Inbox() {
                               <span className="absolute inline-flex h-full w-full animate-pulse rounded-full bg-blue-400 opacity-75" />
                               <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
                             </span>
-                            <span className="hidden text-[11px] font-medium text-blue-600 dark:text-blue-400 sm:inline">
-                              Live
+                          <span className="hidden text-[11px] font-medium text-blue-600 dark:text-blue-400 sm:inline">
+                              {t("issue.live")}
                             </span>
                           </span>
                         )}
@@ -847,15 +846,15 @@ export function Inbox() {
                     )}
                     mobileMeta={
                       issue.lastExternalCommentAt
-                        ? `commented ${timeAgo(issue.lastExternalCommentAt)}`
-                        : `updated ${timeAgo(issue.updatedAt)}`
+                        ? t("inbox.commentedAt", { time: timeAgo(issue.lastExternalCommentAt) })
+                        : t("inbox.updatedAt", { time: timeAgo(issue.updatedAt) })
                     }
                     unreadState={isUnread ? "visible" : isFading ? "fading" : "hidden"}
                     onMarkRead={() => markReadMutation.mutate(issue.id)}
                     trailingMeta={
                       issue.lastExternalCommentAt
-                        ? `commented ${timeAgo(issue.lastExternalCommentAt)}`
-                        : `updated ${timeAgo(issue.updatedAt)}`
+                        ? t("inbox.commentedAt", { time: timeAgo(issue.lastExternalCommentAt) })
+                        : t("inbox.updatedAt", { time: timeAgo(issue.updatedAt) })
                     }
                   />
                 );

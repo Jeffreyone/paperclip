@@ -28,10 +28,17 @@ import { MarkdownEditor, type MarkdownEditorRef } from "./MarkdownEditor";
 import { StatusBadge } from "./StatusBadge";
 
 const levelLabels: Record<string, string> = {
-  company: "Company",
-  team: "Team",
-  agent: "Agent",
-  task: "Task",
+  company: "goal.levelCompany",
+  team: "goal.levelTeam",
+  agent: "goal.levelAgent",
+  task: "goal.levelTask",
+};
+
+const statusLabels: Record<string, string> = {
+  planned: "goal.statusPlanned",
+  active: "goal.statusActive",
+  achieved: "goal.statusAchieved",
+  cancelled: "goal.statusCancelled",
 };
 
 export function NewGoalDialog() {
@@ -72,7 +79,7 @@ export function NewGoalDialog() {
 
   const uploadDescriptionImage = useMutation({
     mutationFn: async (file: File) => {
-      if (!selectedCompanyId) throw new Error("No company selected");
+      if (!selectedCompanyId) throw new Error(t("common.noCompanySelected"));
       return assetsApi.uploadImage(selectedCompanyId, file, "goals/drafts");
     },
   });
@@ -204,7 +211,7 @@ export function NewGoalDialog() {
                   )}
                   onClick={() => { setStatus(s); setStatusOpen(false); }}
                 >
-                  {s}
+                  {t(statusLabels[s] ?? s)}
                 </button>
               ))}
             </PopoverContent>
@@ -215,7 +222,7 @@ export function NewGoalDialog() {
             <PopoverTrigger asChild>
               <button className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs hover:bg-accent/50 transition-colors">
                 <Layers className="h-3 w-3 text-muted-foreground" />
-                {levelLabels[level] ?? level}
+                {t(levelLabels[level] ?? level)}
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-40 p-1" align="start">
@@ -228,7 +235,7 @@ export function NewGoalDialog() {
                   )}
                   onClick={() => { setLevel(l); setLevelOpen(false); }}
                 >
-                  {levelLabels[l] ?? l}
+                  {t(levelLabels[l] ?? l)}
                 </button>
               ))}
             </PopoverContent>

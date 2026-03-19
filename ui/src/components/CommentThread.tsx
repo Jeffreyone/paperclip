@@ -1,5 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import type { IssueComment, Agent } from "@paperclipai/shared";
 import { Button } from "@/components/ui/button";
 import { Check, Copy, Paperclip } from "lucide-react";
@@ -96,12 +97,13 @@ function parseReassignment(target: string): CommentReassignment | null {
 }
 
 function CopyMarkdownButton({ text }: { text: string }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   return (
     <button
       type="button"
       className="text-muted-foreground hover:text-foreground transition-colors"
-      title="Copy as markdown"
+      title={t("commentThread.copyAsMarkdown")}
       onClick={() => {
         navigator.clipboard.writeText(text).then(() => {
           setCopied(true);
@@ -131,8 +133,9 @@ const TimelineList = memo(function TimelineList({
   projectId?: string | null;
   highlightCommentId?: string | null;
 }) {
+  const { t } = useTranslation();
   if (timeline.length === 0) {
-    return <p className="text-sm text-muted-foreground">No comments or runs yet.</p>;
+    return <p className="text-sm text-muted-foreground">{t("commentThread.empty")}</p>;
   }
 
   return (
@@ -271,6 +274,7 @@ export function CommentThread({
   currentAssigneeValue = "",
   mentions: providedMentions,
 }: CommentThreadProps) {
+  const { t } = useTranslation();
   const [body, setBody] = useState("");
   const [reopen, setReopen] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -392,7 +396,7 @@ export function CommentThread({
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold">Comments &amp; Runs ({timeline.length})</h3>
+      <h3 className="text-sm font-semibold">{t("commentThread.title", { count: timeline.length })}</h3>
 
       <TimelineList
         timeline={timeline}
@@ -409,7 +413,7 @@ export function CommentThread({
           ref={editorRef}
           value={body}
           onChange={setBody}
-          placeholder="Leave a comment..."
+          placeholder={t("commentThread.placeholder")}
           mentions={mentions}
           onSubmit={handleSubmit}
           imageUploadHandler={imageUploadHandler}
@@ -430,7 +434,7 @@ export function CommentThread({
                 size="icon-sm"
                 onClick={() => attachInputRef.current?.click()}
                 disabled={attaching}
-                title="Attach image"
+                title={t("commentThread.attachImage")}
               >
                 <Paperclip className="h-4 w-4" />
               </Button>
@@ -444,21 +448,21 @@ export function CommentThread({
                 onChange={(e) => setReopen(e.target.checked)}
                 className="rounded border-border"
               />
-              Re-open
+              {t("commentThread.reopen")}
             </label>
           )}
           {enableReassign && reassignOptions.length > 0 && (
             <InlineEntitySelector
               value={reassignTarget}
               options={reassignOptions}
-              placeholder="Assignee"
-              noneLabel="No assignee"
-              searchPlaceholder="Search assignees..."
-              emptyMessage="No assignees found."
+              placeholder={t("commentThread.assignee")}
+              noneLabel={t("commentThread.noAssignee")}
+              searchPlaceholder={t("commentThread.searchAssignees")}
+              emptyMessage={t("commentThread.noAssigneesFound")}
               onChange={setReassignTarget}
               className="text-xs h-8"
               renderTriggerValue={(option) => {
-                if (!option) return <span className="text-muted-foreground">Assignee</span>;
+                if (!option) return <span className="text-muted-foreground">{t("commentThread.assignee")}</span>;
                 const agentId = option.id.startsWith("agent:") ? option.id.slice("agent:".length) : null;
                 const agent = agentId ? agentMap?.get(agentId) : null;
                 return (
@@ -486,7 +490,7 @@ export function CommentThread({
             />
           )}
           <Button size="sm" disabled={!canSubmit} onClick={handleSubmit}>
-            {submitting ? "Posting..." : "Comment"}
+            {submitting ? t("commentThread.posting") : t("commentThread.comment")}
           </Button>
         </div>
       </div>

@@ -94,25 +94,25 @@ const STAGED_FILE_ACCEPT = "image/*,application/pdf,text/plain,text/markdown,app
 
 const ISSUE_THINKING_EFFORT_OPTIONS = {
   claude_local: [
-    { value: "", label: "Default" },
-    { value: "low", label: "Low" },
-    { value: "medium", label: "Medium" },
-    { value: "high", label: "High" },
+    { value: "", label: "common.default" },
+    { value: "low", label: "common.low" },
+    { value: "medium", label: "common.medium" },
+    { value: "high", label: "common.high" },
   ],
   codex_local: [
-    { value: "", label: "Default" },
-    { value: "minimal", label: "Minimal" },
-    { value: "low", label: "Low" },
-    { value: "medium", label: "Medium" },
-    { value: "high", label: "High" },
+    { value: "", label: "common.default" },
+    { value: "minimal", label: "common.minimal" },
+    { value: "low", label: "common.low" },
+    { value: "medium", label: "common.medium" },
+    { value: "high", label: "common.high" },
   ],
   opencode_local: [
-    { value: "", label: "Default" },
-    { value: "minimal", label: "Minimal" },
-    { value: "low", label: "Low" },
-    { value: "medium", label: "Medium" },
-    { value: "high", label: "High" },
-    { value: "max", label: "Max" },
+    { value: "", label: "common.default" },
+    { value: "minimal", label: "common.minimal" },
+    { value: "low", label: "common.low" },
+    { value: "medium", label: "common.medium" },
+    { value: "high", label: "common.high" },
+    { value: "max", label: "common.max" },
   ],
 } as const;
 
@@ -365,7 +365,7 @@ export function NewIssueDialog() {
             body: t("issue.uploadWarningBody", { count: failures.length }),
             tone: "warn",
           action: prefix
-            ? { label: `Open ${issueRef}`, href: `/${prefix}/issues/${issueRef}` }
+            ? { label: t("issue.openIssue", { issueRef }), href: `/${prefix}/issues/${issueRef}` }
             : undefined,
         });
       }
@@ -377,7 +377,7 @@ export function NewIssueDialog() {
 
   const uploadDescriptionImage = useMutation({
     mutationFn: async (file: File) => {
-      if (!effectiveCompanyId) throw new Error("No company selected");
+      if (!effectiveCompanyId) throw new Error(t("common.noCompanySelected"));
       return assetsApi.uploadImage(effectiveCompanyId, file, "issues/drafts");
     },
   });
@@ -1068,7 +1068,7 @@ export function NewIssueDialog() {
                         )}
                         onClick={() => setAssigneeThinkingEffort(option.value)}
                       >
-                        {option.label}
+                        {t(option.label)}
                       </button>
                     ))}
                   </div>

@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { deriveAgentUrlKey, deriveProjectUrlKey } from "@paperclipai/shared";
+import { getCurrentLanguage } from "../i18n";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -11,7 +12,8 @@ export function formatCents(cents: number): string {
 }
 
 export function formatDate(date: Date | string): string {
-  return new Date(date).toLocaleDateString("en-US", {
+  const locale = getCurrentLanguage() === "zh-CN" ? "zh-CN" : "en-US";
+  return new Date(date).toLocaleDateString(locale, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -19,7 +21,8 @@ export function formatDate(date: Date | string): string {
 }
 
 export function formatDateTime(date: Date | string): string {
-  return new Date(date).toLocaleString("en-US", {
+  const locale = getCurrentLanguage() === "zh-CN" ? "zh-CN" : "en-US";
+  return new Date(date).toLocaleString(locale, {
     month: "short",
     day: "numeric",
     year: "numeric",

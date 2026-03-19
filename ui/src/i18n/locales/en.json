@@ -76,7 +76,13 @@
       "awaitingBoardReview": "Awaiting board review",
       "last14Days": "Last 14 days",
       "noActivityYet": "No activity yet",
-      "recentTasks": "Recent tasks"
+      "recentTasks": "Recent tasks",
+      "auto": "Auto",
+      "minimal": "Minimal",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "max": "Max"
     },
     "nav": {
       "dashboard": "Dashboard",

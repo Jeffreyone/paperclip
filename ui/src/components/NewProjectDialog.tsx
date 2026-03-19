@@ -35,12 +35,12 @@ import { StatusBadge } from "./StatusBadge";
 import { ChoosePathButton } from "./PathInstructionsModal";
 
 const projectStatuses = [
-  { value: "backlog", label: "Backlog" },
-  { value: "planned", label: "Planned" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "completed", label: "Completed" },
-  { value: "cancelled", label: "Cancelled" },
-];
+  { value: "backlog" },
+  { value: "planned" },
+  { value: "in_progress" },
+  { value: "completed" },
+  { value: "cancelled" },
+] as const;
 
 type WorkspaceSetup = "none" | "local" | "repo" | "both";
 const REPO_ONLY_CWD_SENTINEL = "/__paperclip_repo_only__";
@@ -78,7 +78,7 @@ export function NewProjectDialog() {
 
   const uploadDescriptionImage = useMutation({
     mutationFn: async (file: File) => {
-      if (!selectedCompanyId) throw new Error("No company selected");
+      if (!selectedCompanyId) throw new Error(t("common.noCompanySelected"));
       return assetsApi.uploadImage(selectedCompanyId, file, "projects/drafts");
     },
   });
@@ -140,11 +140,11 @@ export function NewProjectDialog() {
     const repoUrl = workspaceRepoUrl.trim();
 
     if (localRequired && !isAbsolutePath(localPath)) {
-      setWorkspaceError("Local folder must be a full absolute path.");
+      setWorkspaceError(t("project.localFolderMustBeAbsolutePath"));
       return;
     }
     if (repoRequired && !isGitHubRepoUrl(repoUrl)) {
-      setWorkspaceError("Repo workspace must use a valid GitHub repo URL.");
+      setWorkspaceError(t("project.repoWorkspaceMustBeValidUrl"));
       return;
     }
 
@@ -228,7 +228,7 @@ export function NewProjectDialog() {
               </span>
             )}
             <span className="text-muted-foreground/60">&rsaquo;</span>
-            <span>New project</span>
+            <span>{t("project.newProject")}</span>
           </div>
           <div className="flex items-center gap-1">
             <Button
@@ -285,8 +285,8 @@ export function NewProjectDialog() {
 
         <div className="px-4 pb-3 space-y-3 border-t border-border">
           <div className="pt-3">
-            <p className="text-sm font-medium">Where will work be done on this project?</p>
-            <p className="text-xs text-muted-foreground">Add local folder and/or GitHub repo workspace hints.</p>
+            <p className="text-sm font-medium">{t("project.workspacePrompt")}</p>
+            <p className="text-xs text-muted-foreground">{t("project.workspacePromptHint")}</p>
           </div>
           <div className="grid gap-2 sm:grid-cols-3">
             <button
@@ -299,9 +299,9 @@ export function NewProjectDialog() {
             >
               <div className="flex items-center gap-2 text-sm font-medium">
                 <FolderOpen className="h-4 w-4" />
-                A local folder
+                {t("project.localFolder")}
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">Use a full path on this machine.</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t("project.localFolderDescription")}</p>
             </button>
             <button
               type="button"
@@ -313,9 +313,9 @@ export function NewProjectDialog() {
             >
               <div className="flex items-center gap-2 text-sm font-medium">
                 <Github className="h-4 w-4" />
-                A github repo
+                {t("project.githubRepo")}
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">Paste a GitHub URL.</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t("project.githubRepoDescription")}</p>
             </button>
             <button
               type="button"
@@ -327,21 +327,21 @@ export function NewProjectDialog() {
             >
               <div className="flex items-center gap-2 text-sm font-medium">
                 <GitBranch className="h-4 w-4" />
-                Both
+                {t("project.both")}
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">Configure local + repo hints.</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t("project.bothDescription")}</p>
             </button>
           </div>
 
           {(workspaceSetup === "local" || workspaceSetup === "both") && (
             <div className="rounded-md border border-border p-2">
-              <label className="mb-1 block text-xs text-muted-foreground">Local folder (full path)</label>
+              <label className="mb-1 block text-xs text-muted-foreground">{t("project.localFolderFullPath")}</label>
               <div className="flex items-center gap-2">
                 <input
                   className="w-full rounded border border-border bg-transparent px-2 py-1 text-xs font-mono outline-none"
                   value={workspaceLocalPath}
                   onChange={(e) => setWorkspaceLocalPath(e.target.value)}
-                  placeholder="/absolute/path/to/workspace"
+                  placeholder={t("project.localFolderPathPlaceholder")}
                 />
                 <ChoosePathButton />
               </div>
@@ -349,12 +349,12 @@ export function NewProjectDialog() {
           )}
           {(workspaceSetup === "repo" || workspaceSetup === "both") && (
             <div className="rounded-md border border-border p-2">
-              <label className="mb-1 block text-xs text-muted-foreground">GitHub repo URL</label>
+              <label className="mb-1 block text-xs text-muted-foreground">{t("project.githubRepoUrl")}</label>
               <input
                 className="w-full rounded border border-border bg-transparent px-2 py-1 text-xs outline-none"
                 value={workspaceRepoUrl}
                 onChange={(e) => setWorkspaceRepoUrl(e.target.value)}
-                placeholder="https://github.com/org/repo"
+                placeholder={t("project.githubRepoUrlPlaceholder")}
               />
             </div>
           )}
@@ -382,7 +382,15 @@ export function NewProjectDialog() {
                   )}
                   onClick={() => { setStatus(s.value); setStatusOpen(false); }}
                 >
-                  {s.label}
+                  {s.value === "backlog"
+                    ? t("project.statusBacklog")
+                    : s.value === "planned"
+                      ? t("project.statusPlanned")
+                      : s.value === "in_progress"
+                        ? t("project.statusInProgress")
+                        : s.value === "completed"
+                          ? t("project.statusCompleted")
+                          : t("project.statusCancelled")}
                 </button>
               ))}
             </PopoverContent>
@@ -422,7 +430,7 @@ export function NewProjectDialog() {
                   className="flex items-center gap-2 w-full px-2 py-1.5 text-xs rounded hover:bg-accent/50 text-muted-foreground"
                   onClick={() => setGoalOpen(false)}
                 >
-                  No goal
+                  {t("project.noGoal")}
                 </button>
               )}
               {availableGoals.map((g) => (
@@ -439,7 +447,7 @@ export function NewProjectDialog() {
               ))}
               {selectedGoals.length > 0 && availableGoals.length === 0 && (
                 <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                  All goals already selected.
+                  {t("project.allGoalsAlreadySelected")}
                 </div>
               )}
             </PopoverContent>
@@ -453,7 +461,7 @@ export function NewProjectDialog() {
               className="bg-transparent outline-none text-xs w-24"
               value={targetDate}
               onChange={(e) => setTargetDate(e.target.value)}
-              placeholder="Target date"
+              placeholder={t("project.targetDate")}
             />
           </div>
         </div>
@@ -461,7 +469,7 @@ export function NewProjectDialog() {
         {/* Footer */}
         <div className="flex items-center justify-between px-4 py-2.5 border-t border-border">
           {createProject.isError ? (
-            <p className="text-xs text-destructive">Failed to create project.</p>
+            <p className="text-xs text-destructive">{t("project.failedToCreate")}</p>
           ) : (
             <span />
           )}
