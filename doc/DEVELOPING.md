@@ -427,3 +427,69 @@ Networking behavior for this smoke script:
 - auto-detects and prints a Paperclip host URL reachable from inside OpenClaw Docker
 - default container-side host alias is `host.docker.internal` (override with `PAPERCLIP_HOST_FROM_CONTAINER` / `PAPERCLIP_HOST_PORT`)
 - if Paperclip rejects container hostnames in authenticated/private mode, allow `host.docker.internal` via `pnpm paperclipai allowed-hostname host.docker.internal` and restart Paperclip
+
+## API Error Conventions
+
+All API error responses follow a unified envelope format defined in `packages/shared/src/types/error.ts`:
+
+```typescript
+interface ApiError {
+  code: string;       // Machine-readable error code (e.g. "NOT_FOUND")
+  message: string;   // Human-readable explanation
+  details?: unknown; // Optional structured data (validation errors, etc.)
+}
+```
+
+### Error Code Reference
+
+| Code | Meaning |
+|---|---|
+| `INTERNAL_ERROR` | Unexpected server error (HTTP 5xx) |
+| `VALIDATION_ERROR` | Request validation failed (HTTP 400, Zod errors) |
+| `AUTHENTICATION_REQUIRED` | No valid credentials (HTTP 401) |
+| `FORBIDDEN` | Valid credentials but insufficient permissions (HTTP 403) |
+| `NOT_FOUND` | Resource does not exist (HTTP 404) |
+| `CONFLICT` | State conflict (HTTP 409) |
+| `UNPROCESSABLE` | Semantically invalid request body (HTTP 422) |
+| `BAD_REQUEST` | Malformed request (HTTP 400) |
+| `UNAUTHORIZED` | Alias for AUTHENTICATION_REQUIRED |
+| `NOT_IMPLEMENTED` | Feature not enabled or supported (HTTP 501) |
+| `BAD_GATEWAY` | Plugin bridge or upstream call failed (HTTP 502) |
+| `SERVICE_UNAVAILABLE` | Service temporarily unavailable (HTTP 503) |
+
+### How It Works
+
+The global `errorHandler` middleware (`server/src/middleware/error-handler.ts`) is the single source of truth. It handles three cases:
+
+1. **`HttpError` instances** — thrown by route handlers using helpers from `server/src/errors.ts`
+2. **`ZodError` instances** — thrown by validation middleware, normalized to `VALIDATION_ERROR`
+3. **Unknown errors** — caught as 500 `INTERNAL_ERROR`, with full context attached for logging
+
+### Throwing Errors in Routes
+
+Prefer throwing `HttpError` (or helpers) over direct `res.status().json()` calls so the global handler normalizes the response:
+
+```typescript
+import { badRequest, notFound, forbidden } from "../errors.js";
+
+// Good — goes through global error handler
+throw notFound("Company not found");
+throw badRequest("Invalid project workspace payload", { issues: parsed.error.issues });
+
+// Avoid — bypasses global handler, may use old envelope format
+res.status(404).json({ error: "Company not found" });
+```
+
+### Error Helpers (`server/src/errors.ts`)
+
+```typescript
+badRequest(message, details?)         // 400 BAD_REQUEST
+unauthorized(message?)                // 401 UNAUTHORIZED
+forbidden(message?)                   // 403 FORBIDDEN
+notFound(message?)                   // 404 NOT_FOUND
+conflict(message, details?)           // 409 CONFLICT
+unprocessable(message, details?)     // 422 UNPROCESSABLE
+new HttpError(status, message, details?, code?)  // Generic
+```
+
+Custom `code` values are optional; the handler derives canonical codes from HTTP status when not provided.
