@@ -59,6 +59,7 @@ type AdapterType =
   | "claude_local"
   | "codex_local"
   | "gemini_local"
+  | "openclaw"
   | "opencode_local"
   | "pi_local"
   | "cursor"
@@ -179,6 +180,7 @@ export function OnboardingWizard() {
     adapterType === "claude_local" ||
     adapterType === "codex_local" ||
     adapterType === "gemini_local" ||
+    adapterType === "openclaw" ||
     adapterType === "opencode_local" ||
     adapterType === "cursor";
   const effectiveAdapterCommand =
@@ -189,6 +191,8 @@ export function OnboardingWizard() {
         ? "gemini"
       : adapterType === "cursor"
       ? "agent"
+      : adapterType === "openclaw"
+      ? "openclaw"
       : adapterType === "opencode_local"
       ? "opencode"
       : "claude");
@@ -789,6 +793,12 @@ export function OnboardingWizard() {
                             desc: "Invoke OpenClaw via gateway protocol",
                             comingSoon: true,
                             disabledLabel: "Configure OpenClaw within the App"
+                          },
+                          {
+                            value: "openclaw" as const,
+                            label: "OpenClaw",
+                            icon: Bot,
+                            desc: "Local OpenClaw subprocess agent"
                           }
                         ].map((opt) => (
                           <button
