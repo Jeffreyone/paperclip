@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { ZodError } from "zod";
-import { HttpError } from "../errors.js";
+import { ERROR_CODES, HttpError, statusToCode } from "../errors.js";
 
 export interface ErrorContext {
   error: { message: string; stack?: string; name?: string; details?: unknown; raw?: unknown };
@@ -30,6 +30,16 @@ function attachErrorContext(
   }
 }
 
+function sendErrorEnvelope(
+  res: Response,
+  status: number,
+  code: string,
+  message: string,
+  details?: unknown,
+) {
+  res.status(status).json({ code, message, ...(details !== undefined ? { details } : {}) });
+}
+
 export function errorHandler(
   err: unknown,
   req: Request,
@@ -45,15 +55,12 @@ export function errorHandler(
         err,
       );
     }
-    res.status(err.status).json({
-      error: err.message,
-      ...(err.details ? { details: err.details } : {}),
-    });
+    sendErrorEnvelope(res, err.status, err.getCode(), err.message, err.details);
     return;
   }
 
   if (err instanceof ZodError) {
-    res.status(400).json({ error: "Validation error", details: err.errors });
+    sendErrorEnvelope(res, 400, ERROR_CODES.VALIDATION_ERROR, "Validation error", err.errors);
     return;
   }
 
@@ -67,5 +74,5 @@ export function errorHandler(
     rootError,
   );
 
-  res.status(500).json({ error: "Internal server error" });
+  sendErrorEnvelope(res, 500, ERROR_CODES.INTERNAL_ERROR, "Internal server error");
 }

@@ -1,4 +1,5 @@
 import type { Request, RequestHandler } from "express";
+import { ERROR_CODES } from "../errors.js";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const DEFAULT_DEV_ORIGINS = [
@@ -58,7 +59,7 @@ export function boardMutationGuard(): RequestHandler {
     }
 
     if (!isTrustedBoardMutationRequest(req)) {
-      res.status(403).json({ error: "Board mutation requires trusted browser origin" });
+      res.status(403).json({ code: ERROR_CODES.FORBIDDEN, message: "Board mutation requires trusted browser origin" });
       return;
     }
 
