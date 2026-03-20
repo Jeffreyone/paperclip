@@ -44,7 +44,7 @@ describe("privateHostnameGuard", () => {
     const app = createApp({ enabled: true, allowedHostnames: ["some-other-host"] });
     const res = await request(app).get("/api/health").set("Host", "dotta-macbook-pro:3100");
     expect(res.status).toBe(403);
-    expect(res.body?.error).toContain("please run pnpm paperclipai allowed-hostname dotta-macbook-pro");
+    expect(res.body?.message).toContain("please run pnpm paperclipai allowed-hostname dotta-macbook-pro");
   });
 
   it("blocks unknown hostnames on page routes with plain-text remediation command", async () => {

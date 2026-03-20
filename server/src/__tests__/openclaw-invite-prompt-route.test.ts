@@ -105,7 +105,8 @@ describe("POST /companies/:companyId/openclaw/invite-prompt", () => {
       .send({});
 
     expect(res.status).toBe(403);
-    expect(res.body.error).toContain("Only CEO agents");
+    expect(res.body.code).toBe("FORBIDDEN");
+    expect(res.body.message).toContain("Only CEO agents");
   });
 
   it("allows CEO agent callers and creates an agent-only invite", async () => {
@@ -176,6 +177,7 @@ describe("POST /companies/:companyId/openclaw/invite-prompt", () => {
       .send({});
 
     expect(res.status).toBe(403);
-    expect(res.body.error).toBe("Permission denied");
+    expect(res.body.code).toBe("FORBIDDEN");
+    expect(res.body.message).toBe("Permission denied");
   });
 });
