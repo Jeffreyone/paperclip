@@ -6,6 +6,7 @@ import type {
   IssueComment,
   IssueDocument,
   IssueLabel,
+  IssueRelationWithIssue,
   UpsertIssueDocument,
 } from "@paperclipai/shared";
 import { api } from "./client";
@@ -22,6 +23,8 @@ export const issuesApi = {
       unreadForUserId?: string;
       labelId?: string;
       q?: string;
+      estimatePointsMin?: number;
+      estimatePointsMax?: number;
     },
   ) => {
     const params = new URLSearchParams();
@@ -33,6 +36,8 @@ export const issuesApi = {
     if (filters?.unreadForUserId) params.set("unreadForUserId", filters.unreadForUserId);
     if (filters?.labelId) params.set("labelId", filters.labelId);
     if (filters?.q) params.set("q", filters.q);
+    if (filters?.estimatePointsMin !== undefined) params.set("estimatePointsMin", String(filters.estimatePointsMin));
+    if (filters?.estimatePointsMax !== undefined) params.set("estimatePointsMax", String(filters.estimatePointsMax));
     const qs = params.toString();
     return api.get<Issue[]>(`/companies/${companyId}/issues${qs ? `?${qs}` : ""}`);
   },
@@ -90,4 +95,10 @@ export const issuesApi = {
     api.post<Approval[]>(`/issues/${id}/approvals`, { approvalId }),
   unlinkApproval: (id: string, approvalId: string) =>
     api.delete<{ ok: true }>(`/issues/${id}/approvals/${approvalId}`),
+  listRelations: (companyId: string, issueId: string) =>
+    api.get<IssueRelationWithIssue[]>(`/companies/${companyId}/issues/${issueId}/relations`),
+  createRelation: (companyId: string, issueId: string, data: { toIssueId: string; type: string }) =>
+    api.post<unknown>(`/companies/${companyId}/issues/${issueId}/relations`, data),
+  deleteRelation: (issueId: string, relationId: string) =>
+    api.delete<unknown>(`/issues/${issueId}/relations/${relationId}`),
 };

@@ -47,10 +47,12 @@ import {
   MessageSquare,
   MoreHorizontal,
   Paperclip,
+  Plus,
   SlidersHorizontal,
   Trash2,
+  Unlink,
 } from "lucide-react";
-import type { ActivityEvent } from "@paperclipai/shared";
+import type { ActivityEvent, IssueRelationWithIssue, IssueRelationType } from "@paperclipai/shared";
 import type { Agent, IssueAttachment } from "@paperclipai/shared";
 
 type CommentReassignment = {
@@ -215,7 +217,10 @@ export function IssueDetail() {
   const [secondaryOpen, setSecondaryOpen] = useState({
     approvals: false,
     cost: false,
+    relations: false,
   });
+  const [addRelationOpen, setAddRelationOpen] = useState(false);
+  const [relationSearch, setRelationSearch] = useState("");
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [attachmentDragActive, setAttachmentDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -251,6 +256,12 @@ export function IssueDetail() {
     queryKey: queryKeys.issues.approvals(issueId!),
     queryFn: () => issuesApi.listApprovals(issueId!),
     enabled: !!issueId,
+  });
+
+  const { data: relations } = useQuery({
+    queryKey: queryKeys.issues.relations(resolvedCompanyId!, issueId!),
+    queryFn: () => issuesApi.listRelations(resolvedCompanyId!, issueId!),
+    enabled: !!resolvedCompanyId && !!issueId,
   });
 
   const { data: attachments } = useQuery({
@@ -589,6 +600,35 @@ export function IssueDetail() {
     },
     onError: (err) => {
       setAttachmentError(err instanceof Error ? err.message : t("issue.deleteFailed"));
+    },
+  });
+
+  const createRelation = useMutation({
+    mutationFn: (data: { toIssueId: string; type: IssueRelationType }) =>
+      issuesApi.createRelation(resolvedCompanyId!, issueId!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.issues.relations(resolvedCompanyId!, issueId!) });
+      setAddRelationOpen(false);
+      setRelationSearch("");
+      pushToast({ title: t("issue.relations"), tone: "success", body: t("common.added") });
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        pushToast({ title: t("issue.addRelation"), tone: "error", body: err.message });
+      }
+    },
+  });
+
+  const deleteRelation = useMutation({
+    mutationFn: (relationId: string) => issuesApi.deleteRelation(issueId!, relationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.issues.relations(resolvedCompanyId!, issueId!) });
+      pushToast({ title: t("issue.relations"), tone: "success", body: t("common.deleted") });
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        pushToast({ title: t("issue.deleteRelation"), tone: "error", body: err.message });
+      }
     },
   });
 
@@ -1161,6 +1201,139 @@ export function IssueDetail() {
           </CollapsibleContent>
         </Collapsible>
       )}
+
+      <Collapsible
+        open={secondaryOpen.relations}
+        onOpenChange={(open) => setSecondaryOpen((prev) => ({ ...prev, relations: open }))}
+        className="rounded-lg border border-border"
+      >
+        <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-left">
+          <span className="text-sm font-medium text-muted-foreground">
+            {t("issue.relations")} {relations && relations.length > 0 ? `(${relations.length})` : ""}
+          </span>
+          <ChevronDown
+            className={cn("h-4 w-4 text-muted-foreground transition-transform", secondaryOpen.relations && "rotate-180")}
+          />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="border-t border-border">
+            {(!relations || relations.length === 0) ? (
+              <p className="px-3 py-2 text-xs text-muted-foreground">{t("issue.noRelations")}</p>
+            ) : (
+              <div className="divide-y divide-border">
+                {relations.map((rel) => {
+                  const targetIssue = rel.toIssue;
+                  const typeLabel = rel.type === "blocks"
+                    ? t("issue.blocksRelation")
+                    : rel.type === "blocked_by"
+                      ? t("issue.blockedByRelation")
+                      : t("issue.duplicateRelation");
+                  const typeColor = rel.type === "blocks"
+                    ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30"
+                    : rel.type === "blocked_by"
+                      ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30"
+                      : "bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/30";
+                  return (
+                    <div key={rel.id} className="flex items-center gap-2 px-3 py-2">
+                      <span className={cn("inline-flex shrink-0 items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium", typeColor)}>
+                        {typeLabel}
+                      </span>
+                      {targetIssue ? (
+                        <Link
+                          to={`/issues/${targetIssue.identifier ?? targetIssue.id}`}
+                          state={location.state}
+                          className="flex min-w-0 flex-1 items-center gap-1 text-xs hover:text-foreground/80 transition-colors"
+                        >
+                          <span className="truncate font-mono text-muted-foreground shrink-0">
+                            {targetIssue.identifier ?? targetIssue.id.slice(0, 8)}
+                          </span>
+                          <span className="truncate">{targetIssue.title}</span>
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-muted-foreground truncate flex-1">
+                          {rel.toIssueId.slice(0, 8)}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+                        onClick={() => deleteRelation.mutate(rel.id)}
+                        disabled={deleteRelation.isPending}
+                        title={t("issue.deleteRelation")}
+                      >
+                        <Unlink className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="border-t border-border px-3 py-2">
+              <Popover open={addRelationOpen} onOpenChange={(open) => { setAddRelationOpen(open); if (!open) setRelationSearch(""); }}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="w-full text-xs gap-1.5">
+                    <Plus className="h-3 w-3" />
+                    {t("issue.addRelation")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 p-2" align="start">
+                  <div className="space-y-2">
+                    <input
+                      className="w-full border border-border rounded px-2 py-1.5 text-xs bg-background outline-none placeholder:text-muted-foreground/50"
+                      placeholder={t("issue.searchIssues")}
+                      value={relationSearch}
+                      onChange={(e) => setRelationSearch(e.target.value)}
+                      autoFocus
+                    />
+                    <div className="max-h-48 overflow-y-auto overscroll-contain space-y-0.5">
+                      {(allIssues ?? [])
+                        .filter((i) => i.id !== issue.id)
+                        .filter((i) => !relationSearch || i.title.toLowerCase().includes(relationSearch.toLowerCase()))
+                        .slice(0, 10)
+                        .map((targetIssue) => (
+                          <div key={targetIssue.id} className="space-y-1">
+                            <span className="block px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
+                              {t("issue.blocksRelation")}
+                            </span>
+                            {(["blocks", "blocked_by", "duplicate"] as const).map((type) => (
+                              <button
+                                key={type}
+                                type="button"
+                                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-accent/50 text-left"
+                                onClick={() => {
+                                  createRelation.mutate({ toIssueId: targetIssue.id, type });
+                                }}
+                                disabled={createRelation.isPending}
+                              >
+                                <span className={cn(
+                                  "shrink-0 inline-flex items-center rounded-full border px-1 py-0.5 text-[9px] font-medium min-w-[52px] justify-center",
+                                  type === "blocks" ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30" :
+                                    type === "blocked_by" ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30" :
+                                      "bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/30",
+                                )}>
+                                  {type === "blocks" ? t("issue.blocksRelation") :
+                                    type === "blocked_by" ? t("issue.blockedByRelation") :
+                                      t("issue.duplicateRelation")}
+                                </span>
+                                <span className="truncate font-mono text-muted-foreground shrink-0">
+                                  {targetIssue.identifier ?? targetIssue.id.slice(0, 8)}
+                                </span>
+                                <span className="truncate">{targetIssue.title}</span>
+                              </button>
+                            ))}
+                          </div>
+                        ))}
+                      {(allIssues ?? []).filter((i) => i.id !== issue.id).filter((i) => !relationSearch || i.title.toLowerCase().includes(relationSearch.toLowerCase())).length === 0 && (
+                        <p className="text-xs text-muted-foreground px-2 py-1">{t("issue.noIssuesFound")}</p>
+                      )}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Mobile properties drawer */}
       <Sheet open={mobilePropsOpen} onOpenChange={setMobilePropsOpen}>

@@ -69,6 +69,7 @@ export {
   issueDocumentFormatSchema,
   issueDocumentKeySchema,
   upsertIssueDocumentSchema,
+  createIssueRelationSchema,
   type CreateIssue,
   type CreateIssueLabel,
   type UpdateIssue,
@@ -79,6 +80,7 @@ export {
   type CreateIssueAttachmentMetadata,
   type IssueDocumentFormat,
   type UpsertIssueDocument,
+  type CreateIssueRelation,
 } from "./issue.js";
 
 export {
@@ -109,9 +111,11 @@ export {
   createSecretSchema,
   rotateSecretSchema,
   updateSecretSchema,
+  revokeSecretSchema,
   type CreateSecret,
   type RotateSecret,
   type UpdateSecret,
+  type RevokeSecret,
 } from "./secret.js";
 
 export {

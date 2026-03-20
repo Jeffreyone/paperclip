@@ -1,4 +1,4 @@
-import type { IssuePriority, IssueStatus } from "../constants.js";
+import type { IssuePriority, IssueStatus, IssueRelationType } from "../constants.js";
 import type { Goal } from "./goal.js";
 import type { Project, ProjectWorkspace } from "./project.js";
 import type { IssueExecutionWorkspaceSettings } from "./workspace-runtime.js";
@@ -116,6 +116,7 @@ export interface Issue {
   identifier: string | null;
   requestDepth: number;
   billingCode: string | null;
+  estimatePoints: number | null;
   assigneeAdapterOverrides: IssueAssigneeAdapterOverrides | null;
   executionWorkspaceSettings: IssueExecutionWorkspaceSettings | null;
   startedAt: Date | null;
@@ -165,4 +166,18 @@ export interface IssueAttachment {
   createdAt: Date;
   updatedAt: Date;
   contentPath: string;
+}
+
+export interface IssueRelation {
+  id: string;
+  companyId: string;
+  fromIssueId: string;
+  toIssueId: string;
+  type: IssueRelationType;
+  createdAt: Date;
+}
+
+export interface IssueRelationWithIssue extends IssueRelation {
+  fromIssue?: { id: string; identifier: string | null; title: string };
+  toIssue?: { id: string; identifier: string | null; title: string };
 }

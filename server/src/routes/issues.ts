@@ -7,6 +7,7 @@ import {
   createIssueLabelSchema,
   checkoutIssueSchema,
   createIssueSchema,
+  createIssueRelationSchema,
   linkIssueApprovalSchema,
   issueDocumentKeySchema,
   upsertIssueDocumentSchema,
@@ -20,6 +21,7 @@ import {
   goalService,
   heartbeatService,
   issueApprovalService,
+  issueRelationService,
   issueService,
   documentService,
   logActivity,
@@ -27,7 +29,7 @@ import {
   approvalService,
 } from "../services/index.js";
 import { logger } from "../middleware/logger.js";
-import { forbidden, HttpError, unauthorized } from "../errors.js";
+import { forbidden, HttpError, notFound, sendErrorResponse, unauthorized } from "../errors.js";
 import { assertCompanyAccess, getActorInfo } from "./authz.js";
 import { shouldWakeAssigneeOnCheckout } from "./issues-checkout-wakeup.js";
 import { isAllowedContentType, MAX_ATTACHMENT_BYTES } from "../attachment-types.js";
@@ -45,6 +47,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
   const projectsSvc = projectService(db);
   const goalsSvc = goalService(db);
   const issueApprovalsSvc = issueApprovalService(db);
+  const issueRelationsSvc = issueRelationService(db);
   const documentsSvc = documentService(db);
   const approvalsSvc = approvalService(db);
   const upload = multer({
@@ -72,16 +75,16 @@ export function issueRoutes(db: Db, storage: StorageService) {
     assertCompanyAccess(req, companyId);
     if (req.actor.type === "board") return true;
     if (!req.actor.agentId) {
-      res.status(403).json({ error: "Agent authentication required" });
+      res.status(403).json({ code: "FORBIDDEN", message: "Agent authentication required" });
       return false;
     }
     const actorAgent = await agentsSvc.getById(req.actor.agentId);
     if (!actorAgent || actorAgent.companyId !== companyId) {
-      res.status(403).json({ error: "Forbidden" });
+      res.status(403).json({ code: "FORBIDDEN", message: "Forbidden" });
       return false;
     }
     if (actorAgent.role === "ceo" || Boolean(actorAgent.permissions?.canCreateAgents)) return true;
-    res.status(403).json({ error: "Missing permission to link approvals" });
+    res.status(403).json({ code: "FORBIDDEN", message: "Missing permission to link approvals" });
     return false;
   }
 
@@ -114,7 +117,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
     if (req.actor.type !== "agent") return null;
     const runId = req.actor.runId?.trim();
     if (runId) return runId;
-    res.status(401).json({ error: "Agent run id required" });
+    res.status(401).json({ code: "UNAUTHORIZED", message: "Agent run id required" });
     return null;
   }
 
@@ -126,7 +129,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
     if (req.actor.type !== "agent") return true;
     const actorAgentId = req.actor.agentId;
     if (!actorAgentId) {
-      res.status(403).json({ error: "Agent authentication required" });
+      res.status(403).json({ code: "FORBIDDEN", message: "Agent authentication required" });
       return false;
     }
     if (issue.status !== "in_progress" || issue.assigneeAgentId !== actorAgentId) {
@@ -189,7 +192,8 @@ export function issueRoutes(db: Db, storage: StorageService) {
   // Common malformed path when companyId is empty in "/api/companies/{companyId}/issues".
   router.get("/issues", (_req, res) => {
     res.status(400).json({
-      error: "Missing companyId in path. Use /api/companies/{companyId}/issues.",
+      code: "BAD_REQUEST",
+      message: "Missing companyId in path. Use /api/companies/{companyId}/issues.",
     });
   });
 
@@ -213,17 +217,20 @@ export function issueRoutes(db: Db, storage: StorageService) {
         : unreadForUserFilterRaw;
 
     if (assigneeUserFilterRaw === "me" && (!assigneeUserId || req.actor.type !== "board")) {
-      res.status(403).json({ error: "assigneeUserId=me requires board authentication" });
+      res.status(403).json({ code: "FORBIDDEN", message: "assigneeUserId=me requires board authentication" });
       return;
     }
     if (touchedByUserFilterRaw === "me" && (!touchedByUserId || req.actor.type !== "board")) {
-      res.status(403).json({ error: "touchedByUserId=me requires board authentication" });
+      res.status(403).json({ code: "FORBIDDEN", message: "touchedByUserId=me requires board authentication" });
       return;
     }
     if (unreadForUserFilterRaw === "me" && (!unreadForUserId || req.actor.type !== "board")) {
-      res.status(403).json({ error: "unreadForUserId=me requires board authentication" });
+      res.status(403).json({ code: "FORBIDDEN", message: "unreadForUserId=me requires board authentication" });
       return;
     }
+
+    const estimatePointsMinRaw = req.query.estimatePointsMin;
+    const estimatePointsMaxRaw = req.query.estimatePointsMax;
 
     const result = await svc.list(companyId, {
       status: req.query.status as string | undefined,
@@ -235,6 +242,8 @@ export function issueRoutes(db: Db, storage: StorageService) {
       parentId: req.query.parentId as string | undefined,
       labelId: req.query.labelId as string | undefined,
       q: req.query.q as string | undefined,
+      estimatePointsMin: typeof estimatePointsMinRaw === "string" ? Number(estimatePointsMinRaw) : undefined,
+      estimatePointsMax: typeof estimatePointsMaxRaw === "string" ? Number(estimatePointsMaxRaw) : undefined,
     });
     res.json(result);
   });
@@ -269,13 +278,13 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const labelId = req.params.labelId as string;
     const existing = await svc.getLabelById(labelId);
     if (!existing) {
-      res.status(404).json({ error: "Label not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Label not found" });
       return;
     }
     assertCompanyAccess(req, existing.companyId);
     const removed = await svc.deleteLabel(labelId);
     if (!removed) {
-      res.status(404).json({ error: "Label not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Label not found" });
       return;
     }
     const actor = getActorInfo(req);
@@ -297,7 +306,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const id = req.params.id as string;
     const issue = await svc.getById(id);
     if (!issue) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     assertCompanyAccess(req, issue.companyId);
@@ -330,7 +339,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const id = req.params.id as string;
     const issue = await svc.getById(id);
     if (!issue) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     assertCompanyAccess(req, issue.companyId);
@@ -403,7 +412,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const id = req.params.id as string;
     const issue = await svc.getById(id);
     if (!issue) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     assertCompanyAccess(req, issue.companyId);
@@ -415,18 +424,18 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const id = req.params.id as string;
     const issue = await svc.getById(id);
     if (!issue) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     assertCompanyAccess(req, issue.companyId);
     const keyParsed = issueDocumentKeySchema.safeParse(String(req.params.key ?? "").trim().toLowerCase());
     if (!keyParsed.success) {
-      res.status(400).json({ error: "Invalid document key", details: keyParsed.error.issues });
+      res.status(400).json({ code: "BAD_REQUEST", message: "Invalid document key", details: keyParsed.error.issues });
       return;
     }
     const doc = await documentsSvc.getIssueDocumentByKey(issue.id, keyParsed.data);
     if (!doc) {
-      res.status(404).json({ error: "Document not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Document not found" });
       return;
     }
     res.json(doc);
@@ -436,13 +445,13 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const id = req.params.id as string;
     const issue = await svc.getById(id);
     if (!issue) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     assertCompanyAccess(req, issue.companyId);
     const keyParsed = issueDocumentKeySchema.safeParse(String(req.params.key ?? "").trim().toLowerCase());
     if (!keyParsed.success) {
-      res.status(400).json({ error: "Invalid document key", details: keyParsed.error.issues });
+      res.status(400).json({ code: "BAD_REQUEST", message: "Invalid document key", details: keyParsed.error.issues });
       return;
     }
 
@@ -485,13 +494,13 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const id = req.params.id as string;
     const issue = await svc.getById(id);
     if (!issue) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     assertCompanyAccess(req, issue.companyId);
     const keyParsed = issueDocumentKeySchema.safeParse(String(req.params.key ?? "").trim().toLowerCase());
     if (!keyParsed.success) {
-      res.status(400).json({ error: "Invalid document key", details: keyParsed.error.issues });
+      res.status(400).json({ code: "BAD_REQUEST", message: "Invalid document key", details: keyParsed.error.issues });
       return;
     }
     const revisions = await documentsSvc.listIssueDocumentRevisions(issue.id, keyParsed.data);
@@ -502,22 +511,22 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const id = req.params.id as string;
     const issue = await svc.getById(id);
     if (!issue) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     assertCompanyAccess(req, issue.companyId);
     if (req.actor.type !== "board") {
-      res.status(403).json({ error: "Board authentication required" });
+      res.status(403).json({ code: "FORBIDDEN", message: "Board authentication required" });
       return;
     }
     const keyParsed = issueDocumentKeySchema.safeParse(String(req.params.key ?? "").trim().toLowerCase());
     if (!keyParsed.success) {
-      res.status(400).json({ error: "Invalid document key", details: keyParsed.error.issues });
+      res.status(400).json({ code: "BAD_REQUEST", message: "Invalid document key", details: keyParsed.error.issues });
       return;
     }
     const removed = await documentsSvc.deleteIssueDocument(issue.id, keyParsed.data);
     if (!removed) {
-      res.status(404).json({ error: "Document not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Document not found" });
       return;
     }
     const actor = getActorInfo(req);
@@ -543,16 +552,16 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const id = req.params.id as string;
     const issue = await svc.getById(id);
     if (!issue) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     assertCompanyAccess(req, issue.companyId);
     if (req.actor.type !== "board") {
-      res.status(403).json({ error: "Board authentication required" });
+      res.status(403).json({ code: "FORBIDDEN", message: "Board authentication required" });
       return;
     }
     if (!req.actor.userId) {
-      res.status(403).json({ error: "Board user context required" });
+      res.status(403).json({ code: "FORBIDDEN", message: "Board user context required" });
       return;
     }
     const readState = await svc.markRead(issue.companyId, issue.id, req.actor.userId, new Date());
@@ -575,7 +584,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const id = req.params.id as string;
     const issue = await svc.getById(id);
     if (!issue) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     assertCompanyAccess(req, issue.companyId);
@@ -587,7 +596,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const id = req.params.id as string;
     const issue = await svc.getById(id);
     if (!issue) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     if (!(await assertCanManageIssueApprovalLinks(req, res, issue.companyId))) return;
@@ -619,7 +628,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const approvalId = req.params.approvalId as string;
     const issue = await svc.getById(id);
     if (!issue) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     if (!(await assertCanManageIssueApprovalLinks(req, res, issue.companyId))) return;
@@ -658,7 +667,8 @@ export function issueRoutes(db: Db, storage: StorageService) {
         const requestedStatus = req.body.status ?? "backlog";
         if (!hasStrategyApproval && ACTIVE_EXECUTION_STATUSES.has(requestedStatus)) {
           res.status(403).json({
-            error: "CEO must have approved strategy before creating tasks in active execution states",
+            code: "FORBIDDEN",
+            message: "CEO must have approved strategy before creating tasks in active execution states",
           });
           return;
         }
@@ -704,7 +714,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const id = req.params.id as string;
     const existing = await svc.getById(id);
     if (!existing) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     assertCompanyAccess(req, existing.companyId);
@@ -740,7 +750,8 @@ export function issueRoutes(db: Db, storage: StorageService) {
           const hasStrategyApproval = await approvalsSvc.hasApprovedCeoStrategy(existing.companyId);
           if (!hasStrategyApproval) {
             res.status(403).json({
-              error: "CEO must have approved strategy before transitioning tasks to active execution states",
+              code: "FORBIDDEN",
+              message: "CEO must have approved strategy before transitioning tasks to active execution states",
             });
             return;
           }
@@ -780,7 +791,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
       throw err;
     }
     if (!issue) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
 
@@ -916,7 +927,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const id = req.params.id as string;
     const existing = await svc.getById(id);
     if (!existing) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     assertCompanyAccess(req, existing.companyId);
@@ -924,7 +935,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
 
     const issue = await svc.remove(id);
     if (!issue) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
 
@@ -955,13 +966,13 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const id = req.params.id as string;
     const issue = await svc.getById(id);
     if (!issue) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     assertCompanyAccess(req, issue.companyId);
 
     if (req.actor.type === "agent" && req.actor.agentId !== req.body.agentId) {
-      res.status(403).json({ error: "Agent can only checkout as itself" });
+      res.status(403).json({ code: "FORBIDDEN", message: "Agent can only checkout as itself" });
       return;
     }
 
@@ -1010,7 +1021,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const id = req.params.id as string;
     const existing = await svc.getById(id);
     if (!existing) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     assertCompanyAccess(req, existing.companyId);
@@ -1024,7 +1035,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
       actorRunId,
     );
     if (!released) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
 
@@ -1047,7 +1058,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const id = req.params.id as string;
     const issue = await svc.getById(id);
     if (!issue) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     assertCompanyAccess(req, issue.companyId);
@@ -1082,13 +1093,13 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const commentId = req.params.commentId as string;
     const issue = await svc.getById(id);
     if (!issue) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     assertCompanyAccess(req, issue.companyId);
     const comment = await svc.getComment(commentId);
     if (!comment || comment.issueId !== id) {
-      res.status(404).json({ error: "Comment not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Comment not found" });
       return;
     }
     res.json(comment);
@@ -1098,7 +1109,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const id = req.params.id as string;
     const issue = await svc.getById(id);
     if (!issue) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     assertCompanyAccess(req, issue.companyId);
@@ -1116,7 +1127,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
     if (reopenRequested && isClosed) {
       const reopenedIssue = await svc.update(id, { status: "todo" });
       if (!reopenedIssue) {
-        res.status(404).json({ error: "Issue not found" });
+        res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
         return;
       }
       reopened = true;
@@ -1144,7 +1155,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
 
     if (interruptRequested) {
       if (req.actor.type !== "board") {
-        res.status(403).json({ error: "Only board users can interrupt active runs from issue comments" });
+        res.status(403).json({ code: "FORBIDDEN", message: "Only board users can interrupt active runs from issue comments" });
         return;
       }
 
@@ -1311,7 +1322,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const issueId = req.params.id as string;
     const issue = await svc.getById(issueId);
     if (!issue) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     assertCompanyAccess(req, issue.companyId);
@@ -1325,11 +1336,11 @@ export function issueRoutes(db: Db, storage: StorageService) {
     assertCompanyAccess(req, companyId);
     const issue = await svc.getById(issueId);
     if (!issue) {
-      res.status(404).json({ error: "Issue not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
       return;
     }
     if (issue.companyId !== companyId) {
-      res.status(422).json({ error: "Issue does not belong to company" });
+      res.status(422).json({ code: "UNPROCESSABLE", message: "Issue does not belong to company" });
       return;
     }
 
@@ -1338,10 +1349,10 @@ export function issueRoutes(db: Db, storage: StorageService) {
     } catch (err) {
       if (err instanceof multer.MulterError) {
         if (err.code === "LIMIT_FILE_SIZE") {
-          res.status(422).json({ error: `Attachment exceeds ${MAX_ATTACHMENT_BYTES} bytes` });
+          res.status(422).json({ code: "UNPROCESSABLE", message: `Attachment exceeds ${MAX_ATTACHMENT_BYTES} bytes` });
           return;
         }
-        res.status(400).json({ error: err.message });
+        res.status(400).json({ code: "BAD_REQUEST", message: err.message });
         return;
       }
       throw err;
@@ -1349,22 +1360,22 @@ export function issueRoutes(db: Db, storage: StorageService) {
 
     const file = (req as Request & { file?: { mimetype: string; buffer: Buffer; originalname: string } }).file;
     if (!file) {
-      res.status(400).json({ error: "Missing file field 'file'" });
+      res.status(400).json({ code: "BAD_REQUEST", message: "Missing file field 'file'" });
       return;
     }
     const contentType = (file.mimetype || "").toLowerCase();
     if (!isAllowedContentType(contentType)) {
-      res.status(422).json({ error: `Unsupported attachment type: ${contentType || "unknown"}` });
+      res.status(422).json({ code: "UNPROCESSABLE", message: `Unsupported attachment type: ${contentType || "unknown"}` });
       return;
     }
     if (file.buffer.length <= 0) {
-      res.status(422).json({ error: "Attachment is empty" });
+      res.status(422).json({ code: "UNPROCESSABLE", message: "Attachment is empty" });
       return;
     }
 
     const parsedMeta = createIssueAttachmentMetadataSchema.safeParse(req.body ?? {});
     if (!parsedMeta.success) {
-      res.status(400).json({ error: "Invalid attachment metadata", details: parsedMeta.error.issues });
+      res.status(400).json({ code: "BAD_REQUEST", message: "Invalid attachment metadata", details: parsedMeta.error.issues });
       return;
     }
 
@@ -1414,7 +1425,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const attachmentId = req.params.attachmentId as string;
     const attachment = await svc.getAttachmentById(attachmentId);
     if (!attachment) {
-      res.status(404).json({ error: "Attachment not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Attachment not found" });
       return;
     }
     assertCompanyAccess(req, attachment.companyId);
@@ -1436,7 +1447,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
     const attachmentId = req.params.attachmentId as string;
     const attachment = await svc.getAttachmentById(attachmentId);
     if (!attachment) {
-      res.status(404).json({ error: "Attachment not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Attachment not found" });
       return;
     }
     assertCompanyAccess(req, attachment.companyId);
@@ -1449,7 +1460,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
 
     const removed = await svc.removeAttachment(attachmentId);
     if (!removed) {
-      res.status(404).json({ error: "Attachment not found" });
+      res.status(404).json({ code: "NOT_FOUND", message: "Attachment not found" });
       return;
     }
 
@@ -1469,6 +1480,115 @@ export function issueRoutes(db: Db, storage: StorageService) {
     });
 
     res.json({ ok: true });
+  });
+
+  router.get("/companies/:companyId/issues/:issueId/relations", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    const issueId = req.params.issueId as string;
+    assertCompanyAccess(req, companyId);
+    const issue = await svc.getById(issueId);
+    if (!issue) {
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
+      return;
+    }
+    if (issue.companyId !== companyId) {
+      res.status(422).json({ code: "UNPROCESSABLE", message: "Issue does not belong to company" });
+      return;
+    }
+    const relations = await issueRelationsSvc.listForIssue(issueId);
+    res.json(relations);
+  });
+
+  router.post("/companies/:companyId/issues/:issueId/relations", validate(createIssueRelationSchema), async (req, res) => {
+    const companyId = req.params.companyId as string;
+    const issueId = req.params.issueId as string;
+    assertCompanyAccess(req, companyId);
+    const issue = await svc.getById(issueId);
+    if (!issue) {
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
+      return;
+    }
+    if (issue.companyId !== companyId) {
+      res.status(422).json({ code: "UNPROCESSABLE", message: "Issue does not belong to company" });
+      return;
+    }
+    const toIssue = await svc.getById(req.body.toIssueId);
+    if (!toIssue) {
+      res.status(404).json({ code: "NOT_FOUND", message: "Target issue not found" });
+      return;
+    }
+    if (toIssue.companyId !== companyId) {
+      res.status(422).json({ code: "UNPROCESSABLE", message: "Target issue does not belong to company" });
+      return;
+    }
+
+    const actor = getActorInfo(req);
+    const relation = await issueRelationsSvc.create(issueId, companyId, req.body.toIssueId, req.body.type);
+
+    await logActivity(db, {
+      companyId,
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      agentId: actor.agentId,
+      runId: actor.runId,
+      action: "issue_relation.created",
+      entityType: "issue_relation",
+      entityId: relation.id,
+      details: {
+        fromIssueId: issueId,
+        toIssueId: req.body.toIssueId,
+        type: req.body.type,
+        identifier: issue.identifier,
+      },
+    });
+
+    res.status(201).json(relation);
+  });
+
+  router.delete("/issues/:issueId/relations/:relationId", async (req, res) => {
+    const issueId = req.params.issueId as string;
+    const relationId = req.params.relationId as string;
+    const relation = await issueRelationsSvc.getById(relationId);
+    if (!relation) {
+      res.status(404).json({ code: "NOT_FOUND", message: "Relation not found" });
+      return;
+    }
+    if (relation.fromIssueId !== issueId) {
+      res.status(404).json({ code: "NOT_FOUND", message: "Relation not found for this issue" });
+      return;
+    }
+    assertCompanyAccess(req, relation.companyId);
+    const issue = await svc.getById(issueId);
+    if (!issue) {
+      res.status(404).json({ code: "NOT_FOUND", message: "Issue not found" });
+      return;
+    }
+
+    const deleted = await issueRelationsSvc.remove(relationId);
+    if (!deleted) {
+      res.status(404).json({ code: "NOT_FOUND", message: "Relation not found" });
+      return;
+    }
+
+    const actor = getActorInfo(req);
+    await logActivity(db, {
+      companyId: relation.companyId,
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      agentId: actor.agentId,
+      runId: actor.runId,
+      action: "issue_relation.deleted",
+      entityType: "issue_relation",
+      entityId: relationId,
+      details: {
+        fromIssueId: issueId,
+        toIssueId: relation.toIssueId,
+        type: relation.type,
+        identifier: issue.identifier,
+      },
+    });
+
+    res.json(deleted);
   });
 
   return router;
