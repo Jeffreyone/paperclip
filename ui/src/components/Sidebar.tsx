@@ -9,6 +9,7 @@ import {
   SquarePen,
   Network,
   Settings,
+  Key,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { SidebarSection } from "./SidebarSection";
@@ -111,6 +112,7 @@ export function Sidebar() {
           <SidebarNavItem to="/costs" label={t("nav.costs")} icon={DollarSign} />
           <SidebarNavItem to="/activity" label={t("nav.activity")} icon={History} />
           <SidebarNavItem to="/company/settings" label={t("nav.settings")} icon={Settings} />
+          <SidebarNavItem to="/company/settings?tab=secrets" label={t("nav.secrets")} icon={Key} />
         </SidebarSection>
 
         <PluginSlotOutlet

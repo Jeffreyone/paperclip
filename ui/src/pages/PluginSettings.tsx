@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Puzzle, ArrowLeft, ShieldAlert, ActivitySquare, CheckCircle, XCircle, Loader2, Clock, Cpu, Webhook, CalendarClock, AlertTriangle } from "lucide-react";
+import { Puzzle, ArrowLeft, ShieldAlert, ActivitySquare, CheckCircle, XCircle, Loader2, Clock, Cpu, Webhook, CalendarClock, AlertTriangle, ChevronRight, RefreshCw, Search, Filter } from "lucide-react";
 import { useCompany } from "@/context/CompanyContext";
 import { useBreadcrumbs } from "@/context/BreadcrumbContext";
 import { Link, Navigate, useParams } from "@/lib/router";
@@ -20,6 +20,16 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PageTabBar } from "@/components/PageTabBar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   JsonSchemaForm,
   validateJsonSchemaForm,
@@ -63,7 +73,14 @@ export function PluginSettings() {
   const { setBreadcrumbs } = useBreadcrumbs();
   const { t } = useTranslation();
   const { companyPrefix, pluginId } = useParams<{ companyPrefix?: string; pluginId: string }>();
-  const [activeTab, setActiveTab] = useState<"configuration" | "status">("configuration");
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<"configuration" | "status" | "logs">("configuration");
+  
+  // Logs filter state
+  const [logLevelFilter, setLogLevelFilter] = useState<string>("all");
+  const [logTimeRange, setLogTimeRange] = useState<string>("24h");
+  const [logSearchQuery, setLogSearchQuery] = useState<string>("");
+  const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
 
   const { data: plugin, isLoading: pluginLoading } = useQuery({
     queryKey: queryKeys.plugins.detail(pluginId!),
@@ -85,11 +102,29 @@ export function PluginSettings() {
     refetchInterval: 30000,
   });
 
+  const getSinceParam = (): string | undefined => {
+    const now = new Date();
+    switch (logTimeRange) {
+      case "1h":
+        return new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+      case "24h":
+        return new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+      case "7d":
+        return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      default:
+        return undefined;
+    }
+  };
+
   const { data: recentLogs } = useQuery({
-    queryKey: queryKeys.plugins.logs(pluginId!),
-    queryFn: () => pluginsApi.logs(pluginId!, { limit: 50 }),
-    enabled: !!pluginId && plugin?.status === "ready",
-    refetchInterval: 30000,
+    queryKey: [...queryKeys.plugins.logs(pluginId!), logLevelFilter, logTimeRange],
+    queryFn: () => pluginsApi.logs(pluginId!, {
+      limit: 500,
+      level: logLevelFilter === "all" ? undefined : logLevelFilter,
+      since: getSinceParam(),
+    }),
+    enabled: !!pluginId && plugin?.status === "ready" && activeTab === "logs",
+    refetchInterval: autoRefresh ? 5000 : false,
   });
 
   // Fetch existing config for the plugin
@@ -171,9 +206,10 @@ export function PluginSettings() {
           items={[
             { value: "configuration", label: t("plugin.configuration") },
             { value: "status", label: t("plugin.status") },
+            { value: "logs", label: t("plugin.logs") },
           ]}
           value={activeTab}
-          onValueChange={(value) => setActiveTab(value as "configuration" | "status")}
+          onValueChange={(value) => setActiveTab(value as "configuration" | "status" | "logs")}
         />
 
         <TabsContent value="configuration" className="space-y-6">
@@ -540,11 +576,132 @@ export function PluginSettings() {
             </div>
           </div>
         </TabsContent>
+
+        <TabsContent value="logs" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-1.5">
+                <ActivitySquare className="h-4 w-4" />
+                {t("plugin.logs")}
+              </CardTitle>
+              <CardDescription>{t("plugin.logsDescription")}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">{t("plugin.levelFilter")}</span>
+                  <Select value={logLevelFilter} onValueChange={setLogLevelFilter}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder={t("plugin.allLevels")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("plugin.allLevels")}</SelectItem>
+                      <SelectItem value="error">Error</SelectItem>
+                      <SelectItem value="warn">Warn</SelectItem>
+                      <SelectItem value="info">Info</SelectItem>
+                      <SelectItem value="debug">Debug</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">{t("plugin.timeRange")}</span>
+                  <Select value={logTimeRange} onValueChange={setLogTimeRange}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1h">{t("plugin.last1Hour")}</SelectItem>
+                      <SelectItem value="24h">{t("plugin.last24Hours")}</SelectItem>
+                      <SelectItem value="7d">{t("plugin.last7Days")}</SelectItem>
+                      <SelectItem value="all">{t("plugin.allTime")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder={t("plugin.searchLogs")}
+                    value={logSearchQuery}
+                    onChange={(e) => setLogSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="autoRefresh"
+                    checked={autoRefresh}
+                    onCheckedChange={(checked) => setAutoRefresh(checked as boolean)}
+                  />
+                  <label
+                    htmlFor="autoRefresh"
+                    className="text-sm text-muted-foreground cursor-pointer"
+                  >
+                    {t("plugin.autoRefresh")}
+                  </label>
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => queryClient.invalidateQueries({ queryKey: [...queryKeys.plugins.logs(pluginId!), logLevelFilter, logTimeRange] })}
+                >
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                  Refresh
+                </Button>
+              </div>
+
+              <div className="rounded-md border border-border">
+                <div className="max-h-[600px] overflow-y-auto">
+                  {recentLogs === undefined ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      <span className="ml-2 text-sm text-muted-foreground">{t("plugin.loadingLogs")}</span>
+                    </div>
+                  ) : recentLogs.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <ActivitySquare className="h-8 w-8 text-muted-foreground/50" />
+                      <p className="mt-3 text-sm text-muted-foreground">
+                        {logSearchQuery || logLevelFilter !== "all" || logTimeRange !== "24h"
+                          ? t("plugin.noLogsMatchFilters")
+                          : t("plugin.noLogs")}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border/50">
+                      {recentLogs
+                        .filter((log) =>
+                          logSearchQuery
+                            ? log.message.toLowerCase().includes(logSearchQuery.toLowerCase())
+                            : true
+                        )
+                        .map((entry) => (
+                          <LogEntry key={entry.id} entry={entry} />
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {recentLogs && recentLogs.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {t("plugin.lastCountLogEntriesWithFilters", { count: recentLogs.length })}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   );
 }
 
+// ---------------------------------------------------------------------------
+// LogEntry component
 // ---------------------------------------------------------------------------
 // PluginConfigForm — auto-generated form for instanceConfigSchema
 // ---------------------------------------------------------------------------
@@ -741,6 +898,72 @@ function PluginConfigForm({ pluginId, schema, initialValues, isLoading, pluginSt
           </Button>
         )}
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// LogEntry component
+// ---------------------------------------------------------------------------
+
+interface LogEntryProps {
+  entry: {
+    id: string;
+    pluginId: string;
+    level: string;
+    message: string;
+    meta: Record<string, unknown> | null;
+    createdAt: string;
+  };
+}
+
+function LogEntry({ entry }: LogEntryProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const hasMeta = entry.meta && Object.keys(entry.meta).length > 0;
+
+  const levelColor =
+    entry.level === "error"
+      ? "text-red-600 dark:text-red-400"
+      : entry.level === "warn"
+        ? "text-yellow-600 dark:text-yellow-400"
+        : entry.level === "debug"
+          ? "text-muted-foreground/60"
+          : "text-foreground";
+
+  const levelBadgeVariant =
+    entry.level === "error"
+      ? "destructive"
+      : entry.level === "warn"
+        ? "secondary"
+        : "outline";
+
+  return (
+    <div className="space-y-1 border-b border-border/50 py-2 last:border-0">
+      <div className="flex items-start gap-2 font-mono text-xs">
+        <span className="shrink-0 text-muted-foreground/50">
+          {new Date(entry.createdAt).toLocaleTimeString()}
+        </span>
+        <Badge variant={levelBadgeVariant} className="h-4 shrink-0 px-1 text-[10px]">
+          {entry.level}
+        </Badge>
+        <span className={`flex-1 ${levelColor}`}>{entry.message}</span>
+        {hasMeta && (
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-4 w-4 shrink-0">
+              <ChevronRight className={`h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+            </Button>
+          </CollapsibleTrigger>
+        )}
+      </div>
+      {hasMeta && (
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+          <CollapsibleContent className="mt-1">
+            <pre className="rounded-md bg-muted/50 p-2 text-xs text-muted-foreground">
+              {JSON.stringify(entry.meta, null, 2)}
+            </pre>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
     </div>
   );
 }

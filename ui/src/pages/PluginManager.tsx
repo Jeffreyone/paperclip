@@ -30,6 +30,13 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/context/ToastContext";
 import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 function firstNonEmptyLine(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -92,6 +99,8 @@ export function PluginManager() {
   const [uninstallPluginId, setUninstallPluginId] = useState<string | null>(null);
   const [uninstallPluginName, setUninstallPluginName] = useState<string>("");
   const [errorDetailsPlugin, setErrorDetailsPlugin] = useState<PluginRecord | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | PluginRecord["status"]>("all");
 
   useEffect(() => {
     setBreadcrumbs([
@@ -178,6 +187,20 @@ export function PluginManager() {
       ),
     [installedPlugins, t]
   );
+
+  const filteredPlugins = useMemo(() => {
+    return installedPlugins.filter((plugin) => {
+      const matchesSearch =
+        searchQuery === "" ||
+        plugin.manifestJson.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        plugin.manifestJson.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        plugin.packageName.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesStatus = statusFilter === "all" || plugin.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [installedPlugins, searchQuery, statusFilter]);
 
   if (isLoading) return <div className="p-4 text-sm text-muted-foreground">{t("pluginManager.loading")}</div>;
   if (error) return <div className="p-4 text-sm text-destructive">{t("pluginManager.failedToLoad")}</div>;
@@ -330,24 +353,53 @@ export function PluginManager() {
       </section>
 
       <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Puzzle className="h-5 w-5 text-muted-foreground" />
-          <h2 className="text-base font-semibold">{t("pluginManager.installedPlugins")}</h2>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Puzzle className="h-5 w-5 text-muted-foreground" />
+            <h2 className="text-base font-semibold">{t("pluginManager.installedPlugins")}</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder={t("pluginManager.searchPlaceholder")}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-64"
+            />
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder={t("pluginManager.statusFilter")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("pluginManager.statusFilterAll")}</SelectItem>
+                <SelectItem value="ready">{t("pluginManager.statusReady")}</SelectItem>
+                <SelectItem value="error">{t("pluginManager.statusError")}</SelectItem>
+                <SelectItem value="disabled">{t("pluginManager.statusDisabled")}</SelectItem>
+                <SelectItem value="installed">{t("pluginManager.statusInstalled")}</SelectItem>
+                <SelectItem value="upgrade_pending">{t("pluginManager.statusUpgradePending")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        {!installedPlugins.length ? (
+        {!filteredPlugins.length ? (
           <Card className="bg-muted/30">
             <CardContent className="flex flex-col items-center justify-center py-10">
               <Puzzle className="h-10 w-10 text-muted-foreground mb-4" />
-              <p className="text-sm font-medium">{t("pluginManager.noPluginsInstalled")}</p>
+              <p className="text-sm font-medium">
+                {installedPlugins.length === 0
+                  ? t("pluginManager.noPluginsInstalled")
+                  : t("pluginManager.noPluginsInstalled")}
+              </p>
               <p className="text-xs text-muted-foreground mt-1">
-                {t("pluginManager.noPluginsInstalledHint")}
+                {installedPlugins.length === 0
+                  ? t("pluginManager.noPluginsInstalledHint")
+                  : t("pluginManager.noPluginsMatchFilters")}
               </p>
             </CardContent>
           </Card>
         ) : (
           <ul className="divide-y rounded-md border bg-card">
-            {installedPlugins.map((plugin) => (
+            {filteredPlugins.map((plugin) => (
               <li key={plugin.id}>
                 <div className="flex items-start gap-4 px-4 py-3">
                   <div className="min-w-0 flex-1">
@@ -362,11 +414,21 @@ export function PluginManager() {
                       {examplePackageNames.has(plugin.packageName) && (
                         <Badge variant="outline">{t("pluginManager.example")}</Badge>
                       )}
+                      {plugin.manifestJson.categories?.map((category) => (
+                        <Badge key={category} variant="outline" className="text-xs">
+                          {category}
+                        </Badge>
+                      ))}
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground mt-0.5 truncate" title={plugin.packageName}>
                         {plugin.packageName} · v{plugin.manifestJson.version ?? plugin.version}
                       </p>
+                      {plugin.manifestJson.author && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {t("pluginManager.author")}: {plugin.manifestJson.author}
+                        </p>
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground truncate mt-0.5" title={plugin.manifestJson.description}>
                       {plugin.manifestJson.description || t("pluginManager.noDescription")}

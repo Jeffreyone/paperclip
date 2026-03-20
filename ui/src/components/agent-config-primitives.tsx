@@ -56,6 +56,8 @@ const helpKeys = [
   "cooldownSec",
   "maxConcurrentRuns",
   "budgetMonthlyCents",
+  "e2bTemplate",
+  "e2bStartupCommand",
 ] as const;
 
 export function useAdapterHelp() {
@@ -94,7 +96,7 @@ export const help: Record<string, string> = {
   localCommand: "Override the path to the CLI command you want the adapter to call (e.g. /usr/local/bin/claude, codex, opencode).",
   args: "Command-line arguments, comma-separated.",
   extraArgs: "Extra CLI arguments for local adapters, comma-separated.",
-  envVars: "Environment variables injected into the adapter process. Use plain values or secret references.",
+  envVars: "Environment variables injected into the adapter process. Plain values or secret references. For secrets, use a JSON object: {\"KEY\": {\"type\":\"secret_ref\",\"secretId\":\"uuid\",\"version\":\"latest\"}}. Plain value: {\"KEY\": {\"type\":\"plain\",\"value\":\"secret123\"}}.",
   bootstrapPrompt: "Only sent when Paperclip starts a fresh session. Use this for stable setup guidance that should not be repeated on every heartbeat.",
   payloadTemplateJson: "Optional JSON merged into remote adapter request payloads before Paperclip adds its standard wake and workspace fields.",
   webhookUrl: "The URL that receives POST requests when the agent is invoked.",
@@ -106,6 +108,8 @@ export const help: Record<string, string> = {
   cooldownSec: "Minimum seconds between consecutive heartbeat runs.",
   maxConcurrentRuns: "Maximum number of heartbeat runs that can execute simultaneously for this agent.",
   budgetMonthlyCents: "Monthly spending limit in cents. 0 means no limit.",
+  e2bTemplate: "E2B sandbox template name or ID. Leave blank to use the default 'base' template.",
+  e2bStartupCommand: "Command executed when the sandbox starts. Default: echo 'E2B sandbox ready'",
 };
 
 export const adapterLabels: Record<string, string> = {
@@ -117,6 +121,7 @@ export const adapterLabels: Record<string, string> = {
   cursor: "Cursor (local)",
   process: "Process",
   http: "HTTP",
+  e2b: "E2B Cloud Sandbox",
 };
 
 export const roleLabels = AGENT_ROLE_LABELS as Record<string, string>;
