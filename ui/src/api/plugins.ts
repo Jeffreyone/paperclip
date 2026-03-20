@@ -136,6 +136,9 @@ export interface AvailablePluginExample {
   pluginKey: string;
   displayName: string;
   description: string;
+  version: string;
+  author: string;
+  categories: string[];
   localPath: string;
   tag: "example";
 }
