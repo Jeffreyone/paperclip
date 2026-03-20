@@ -1,0 +1,1 @@
+ALTER TABLE "agents" ADD COLUMN "url_key" text;
