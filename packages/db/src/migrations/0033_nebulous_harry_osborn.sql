@@ -1,0 +1,2 @@
+ALTER TABLE "plugin_config_revisions" ALTER COLUMN "changed_by_user_id" SET DATA TYPE uuid;--> statement-breakpoint
+ALTER TABLE "plugin_config_revisions" ALTER COLUMN "changed_by_agent_id" SET DATA TYPE uuid;

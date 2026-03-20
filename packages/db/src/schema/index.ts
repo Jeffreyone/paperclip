@@ -37,6 +37,8 @@ export { companySecrets } from "./company_secrets.js";
 export { companySecretVersions } from "./company_secret_versions.js";
 export { plugins } from "./plugins.js";
 export { pluginConfig } from "./plugin_config.js";
+export { pluginConfigRevisions } from "./plugin_config_revisions.js";
+export { pluginVersions } from "./plugin_versions.js";
 export { pluginCompanySettings } from "./plugin_company_settings.js";
 export { pluginState } from "./plugin_state.js";
 export { pluginEntities } from "./plugin_entities.js";

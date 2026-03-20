@@ -35,6 +35,10 @@ export const plugins = pgTable(
     /** Resolved package path for local-path installs; used to find worker entrypoint. */
     packagePath: text("package_path"),
     lastError: text("last_error"),
+    /** Number of consecutive worker crashes since last successful startup. Resets on successful init. */
+    crashCount: integer("crash_count").notNull().default(0),
+    /** Timestamp of the most recent worker crash. Null if never crashed. */
+    lastCrashAt: timestamp("last_crash_at", { withTimezone: true }),
     installedAt: timestamp("installed_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
