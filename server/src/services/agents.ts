@@ -182,10 +182,10 @@ export function deduplicateAgentName(
 }
 
 export function agentService(db: Db) {
-  function withUrlKey<T extends { id: string; name: string }>(row: T) {
+  function withUrlKey<T extends { id: string; name: string; urlKey?: string | null }>(row: T) {
     return {
       ...row,
-      urlKey: normalizeAgentUrlKey(row.name) ?? row.id,
+      urlKey: row.urlKey ?? normalizeAgentUrlKey(row.name) ?? row.id,
     };
   }
 
@@ -291,6 +291,10 @@ export function agentService(db: Db) {
       const role = (data.role ?? existing.role) as string;
       normalizedPatch.permissions = normalizeAgentPermissions(data.permissions, role);
     }
+    if (data.name !== undefined) {
+      const newUrlKey = normalizeAgentUrlKey(data.name) ?? data.name;
+      normalizedPatch.urlKey = newUrlKey;
+    }
 
     const shouldRecordRevision = Boolean(options?.recordRevision) && hasConfigPatchFields(normalizedPatch);
     const beforeConfig = shouldRecordRevision ? buildConfigSnapshot(existing) : null;
@@ -351,7 +355,14 @@ export function agentService(db: Db) {
       const normalizedPermissions = normalizeAgentPermissions(data.permissions, role);
       const created = await db
         .insert(agents)
-        .values({ ...data, name: uniqueName, companyId, role, permissions: normalizedPermissions })
+        .values({
+          ...data,
+          name: uniqueName,
+          companyId,
+          role,
+          permissions: normalizedPermissions,
+          urlKey: normalizeAgentUrlKey(uniqueName) ?? uniqueName,
+        })
         .returning()
         .then((rows) => rows[0]);
 
