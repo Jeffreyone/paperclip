@@ -1,4 +1,6 @@
 export type { Company } from "./company.js";
+export { API_ERROR_CODES } from "./error.js";
+export type { ApiError, ApiErrorCode } from "./error.js";
 export type {
   Agent,
   AgentPermissions,

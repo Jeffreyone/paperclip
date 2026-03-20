@@ -97,6 +97,9 @@ export {
   type PluginBridgeErrorCode,
 } from "./constants.js";
 
+export { API_ERROR_CODES } from "./types/error.js";
+export type { ApiError, ApiErrorCode } from "./types/error.js";
+
 export type {
   Company,
   Agent,

@@ -248,4 +248,6 @@ export interface CreateConfigValues {
   maxTurnsPerRun: number;
   heartbeatEnabled: boolean;
   intervalSec: number;
+  template?: string;
+  startupCommand?: string;
 }
