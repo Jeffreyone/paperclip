@@ -33,6 +33,15 @@ import {
   agentConfigurationDoc as openCodeAgentConfigurationDoc,
 } from "@paperclipai/adapter-opencode-local";
 import {
+  execute as openclawExecute,
+  testEnvironment as openclawTestEnvironment,
+  sessionCodec as openclawSessionCodec,
+} from "@paperclipai/adapter-openclaw/server";
+import {
+  agentConfigurationDoc as openclawAgentConfigurationDoc,
+  models as openclawModels,
+} from "@paperclipai/adapter-openclaw";
+import {
   execute as openclawGatewayExecute,
   testEnvironment as openclawGatewayTestEnvironment,
 } from "@paperclipai/adapter-openclaw-gateway/server";
@@ -62,6 +71,16 @@ import {
 } from "hermes-paperclip-adapter";
 import { processAdapter } from "./process/index.js";
 import { httpAdapter } from "./http/index.js";
+import { e2bAdapter } from "./e2b/index.js";
+import {
+  execute as cursorHttpExecute,
+  testEnvironment as cursorHttpTestEnvironment,
+  sessionCodec as cursorHttpSessionCodec,
+} from "@paperclipai/adapter-cursor-http/server";
+import {
+  agentConfigurationDoc as cursorHttpAgentConfigurationDoc,
+  models as cursorHttpModels,
+} from "@paperclipai/adapter-cursor-http";
 
 const claudeLocalAdapter: ServerAdapterModule = {
   type: "claude_local",
@@ -105,6 +124,16 @@ const geminiLocalAdapter: ServerAdapterModule = {
   agentConfigurationDoc: geminiAgentConfigurationDoc,
 };
 
+const openclawAdapter: ServerAdapterModule = {
+  type: "openclaw",
+  execute: openclawExecute,
+  testEnvironment: openclawTestEnvironment,
+  sessionCodec: openclawSessionCodec,
+  models: openclawModels,
+  supportsLocalAgentJwt: false,
+  agentConfigurationDoc: openclawAgentConfigurationDoc,
+};
+
 const openclawGatewayAdapter: ServerAdapterModule = {
   type: "openclaw_gateway",
   execute: openclawGatewayExecute,
@@ -146,18 +175,31 @@ const hermesLocalAdapter: ServerAdapterModule = {
   agentConfigurationDoc: hermesAgentConfigurationDoc,
 };
 
+const cursorHttpAdapter: ServerAdapterModule = {
+  type: "cursor_http",
+  execute: cursorHttpExecute,
+  testEnvironment: cursorHttpTestEnvironment,
+  sessionCodec: cursorHttpSessionCodec,
+  models: cursorHttpModels,
+  supportsLocalAgentJwt: false,
+  agentConfigurationDoc: cursorHttpAgentConfigurationDoc,
+};
+
 const adaptersByType = new Map<string, ServerAdapterModule>(
   [
     claudeLocalAdapter,
     codexLocalAdapter,
+    openclawAdapter,
     openCodeLocalAdapter,
     piLocalAdapter,
     cursorLocalAdapter,
+    cursorHttpAdapter,
     geminiLocalAdapter,
     openclawGatewayAdapter,
     hermesLocalAdapter,
     processAdapter,
     httpAdapter,
+    e2bAdapter,
   ].map((a) => [a.type, a]),
 );
 
