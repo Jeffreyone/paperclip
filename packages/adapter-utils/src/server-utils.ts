@@ -1,6 +1,16 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { constants as fsConstants, promises as fs } from "node:fs";
 import path from "node:path";
+import {
+  parseObject,
+  asString,
+  asNumber,
+  asBoolean,
+  asStringArray,
+  parseJson,
+} from "./json-utils.js";
+
+export { parseObject, asString, asNumber, asBoolean, asStringArray, parseJson };
 
 export interface RunProcessResult {
   exitCode: number | null;
@@ -48,37 +58,6 @@ function normalizePathSlashes(value: string): string {
 
 function isMaintainerOnlySkillTarget(candidate: string): boolean {
   return normalizePathSlashes(candidate).includes("/.agents/skills/");
-}
-
-export function parseObject(value: unknown): Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return {};
-  }
-  return value as Record<string, unknown>;
-}
-
-export function asString(value: unknown, fallback: string): string {
-  return typeof value === "string" && value.length > 0 ? value : fallback;
-}
-
-export function asNumber(value: unknown, fallback: number): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
-}
-
-export function asBoolean(value: unknown, fallback: boolean): boolean {
-  return typeof value === "boolean" ? value : fallback;
-}
-
-export function asStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
-}
-
-export function parseJson(value: string): Record<string, unknown> | null {
-  try {
-    return JSON.parse(value) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
 }
 
 export function appendWithCap(prev: string, chunk: string, cap = MAX_CAPTURE_BYTES) {
