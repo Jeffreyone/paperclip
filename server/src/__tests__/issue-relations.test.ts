@@ -4,6 +4,7 @@ import request from "supertest";
 import { issueRelationService } from "../services/issue-relations.ts";
 import { issueRoutes } from "../routes/issues.ts";
 import { errorHandler } from "../middleware/index.js";
+import { unprocessable } from "../errors.js";
 
 const selectSeq = vi.hoisted(() => ({
   calls: [] as unknown[][],
@@ -279,8 +280,16 @@ describe("issueRelationService — listForIssue N+1 查询", () => {
 // API Route 层测试 — 跨公司访问安全
 // ---------------------------------------------------------------------------
 
+const ID1 = "11111111-1111-1111-1111-111111111111";
+const ID2 = "22222222-2222-2222-2222-222222222222";
+const ID3 = "33333333-3333-3333-3333-333333333333";
+const CID1 = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+const CID2 = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+const REL1 = "rrrrrrrr-rrrr-rrrr-rrrr-rrrrrrrrrrrr";
+
 const mockIssueService = vi.hoisted(() => ({
   getById: vi.fn(),
+  getByIdentifier: vi.fn(),
 }));
 
 const mockRelationService = vi.hoisted(() => ({
@@ -318,19 +327,21 @@ const mockHeartbeatService = vi.hoisted(() => ({
   hasActiveRun: vi.fn(),
 }));
 
-vi.mock("../services/index.js", () => ({
-  issueService: () => mockIssueService,
-  issueRelationService: () => mockRelationService,
-  agentService: () => mockAgentService,
-  projectService: () => mockProjectService,
-  goalService: () => mockGoalService,
-  issueApprovalService: () => mockIssueApprovalService,
-  documentService: () => mockDocumentService,
-  approvalService: () => mockApprovalService,
-  heartbeatService: () => mockHeartbeatService,
-  accessService: () => ({}),
-  logActivity: vi.fn(),
-}));
+vi.mock("../services/index.js", () => {
+  return {
+    issueService: () => mockIssueService,
+    issueRelationService: () => mockRelationService,
+    agentService: () => () => mockAgentService,
+    projectService: () => () => mockProjectService,
+    goalService: () => () => mockGoalService,
+    issueApprovalService: () => () => mockIssueApprovalService,
+    documentService: () => () => mockDocumentService,
+    approvalService: () => () => mockApprovalService,
+    heartbeatService: () => () => mockHeartbeatService,
+    accessService: () => () => ({}),
+    logActivity: () => vi.fn(),
+  };
+});
 
 function createApp(actorOverrides: Record<string, unknown> = {}) {
   const app = express();
@@ -339,7 +350,7 @@ function createApp(actorOverrides: Record<string, unknown> = {}) {
     (req as any).actor = {
       type: "board",
       userId: "user-1",
-      companyIds: ["company-1"],
+      companyIds: [CID1],
       source: "session",
       isInstanceAdmin: false,
       ...actorOverrides,
@@ -354,23 +365,23 @@ function createApp(actorOverrides: Record<string, unknown> = {}) {
 describe("API: GET /companies/:companyId/issues/:issueId/relations — 跨公司访问", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockIssueService.getByIdentifier.mockResolvedValue(null);
   });
 
   it("board 访问同公司 issue → 200", async () => {
-    mockIssueService.getById.mockResolvedValue({ id: "issue-1", companyId: "company-1" });
+    mockIssueService.getById.mockResolvedValue({ id: ID1, companyId: CID1 });
     mockRelationService.listForIssue.mockResolvedValue([]);
-    const app = createApp({ companyIds: ["company-1"] });
+    const app = createApp({ companyIds: [CID1] });
     const res = await request(app)
-      .get("/api/companies/company-1/issues/issue-1/relations")
-      .query({ actorType: "board" });
+      .get(`/api/companies/${CID1}/issues/${ID1}/relations`);
     expect(res.status).toBe(200);
   });
 
   it("board 访问其他公司 issue → 403", async () => {
-    mockIssueService.getById.mockResolvedValue({ id: "issue-2", companyId: "company-2" });
-    const app = createApp({ companyIds: ["company-1"] });
+    mockIssueService.getById.mockResolvedValue({ id: ID2, companyId: CID2 });
+    const app = createApp({ companyIds: [CID1] });
     const res = await request(app)
-      .get("/api/companies/company-2/issues/issue-2/relations");
+      .get(`/api/companies/${CID2}/issues/${ID2}/relations`);
     expect(res.status).toBe(403);
   });
 
@@ -378,7 +389,7 @@ describe("API: GET /companies/:companyId/issues/:issueId/relations — 跨公司
     mockIssueService.getById.mockResolvedValue(null);
     const app = createApp();
     const res = await request(app)
-      .get("/api/companies/company-1/issues/nonexistent/relations");
+      .get(`/api/companies/${CID1}/issues/nonexistent/relations`);
     expect(res.status).toBe(404);
   });
 });
@@ -386,106 +397,101 @@ describe("API: GET /companies/:companyId/issues/:issueId/relations — 跨公司
 describe("API: POST /companies/:companyId/issues/:issueId/relations — 跨公司访问", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockIssueService.getByIdentifier.mockResolvedValue(null);
   });
 
-  it("board 在不同公司 issue 上创建关系 → 403", async () => {
+  it("board 在不同公司 issue 上创建关系 → 422", async () => {
     mockIssueService.getById
-      .mockResolvedValueOnce({ id: "issue-1", companyId: "company-1" })  // from issue
-      .mockResolvedValueOnce({ id: "issue-2", companyId: "company-2" }); // to issue
-    const app = createApp({ companyIds: ["company-1"] });
+      .mockResolvedValueOnce({ id: ID1, companyId: CID1 })
+      .mockResolvedValueOnce({ id: ID2, companyId: CID2 });
+    const app = createApp({ companyIds: [CID1] });
     const res = await request(app)
-      .post("/api/companies/company-1/issues/issue-1/relations")
-      .send({ toIssueId: "issue-2", type: "blocks" });
-    // toIssue.companyId (company-2) !== companyId param (company-1) → 422
-    // 但 actor 也没有 company-2 访问权，所以应该 403
-    // 实际上 route 先检查 issue.companyId !== companyId → 422
-    expect([403, 422]).toContain(res.status);
+      .post(`/api/companies/${CID1}/issues/${ID1}/relations`)
+      .send({ toIssueId: ID2, type: "blocks" });
+    expect(res.status).toBe(422);
   });
 
   it("toIssue 不存在 → 404", async () => {
     mockIssueService.getById
-      .mockResolvedValueOnce({ id: "issue-1", companyId: "company-1" })
+      .mockResolvedValueOnce({ id: ID1, companyId: CID1 })
       .mockResolvedValueOnce(null);
     const app = createApp();
     const res = await request(app)
-      .post("/api/companies/company-1/issues/issue-1/relations")
-      .send({ toIssueId: "nonexistent", type: "blocks" });
+      .post(`/api/companies/${CID1}/issues/${ID1}/relations`)
+      .send({ toIssueId: "22222222-2222-2222-2222-222222222220", type: "blocks" });
     expect(res.status).toBe(404);
   });
 
   it("创建循环依赖 → 422", async () => {
     mockIssueService.getById
-      .mockResolvedValueOnce({ id: "issue-1", companyId: "company-1", identifier: "TEST-1" })
-      .mockResolvedValueOnce({ id: "issue-2", companyId: "company-1" });
-    mockRelationService.create.mockRejectedValue(
-      Object.assign(new Error("Circular blocks dependency detected"), { status: 422 }),
-    );
+      .mockResolvedValueOnce({ id: ID1, companyId: CID1, identifier: "TEST-1" })
+      .mockResolvedValueOnce({ id: ID2, companyId: CID1 });
+    mockRelationService.create.mockRejectedValue(unprocessable("Circular blocks dependency detected"));
     const app = createApp();
     const res = await request(app)
-      .post("/api/companies/company-1/issues/issue-1/relations")
-      .send({ toIssueId: "issue-2", type: "blocks" });
+      .post(`/api/companies/${CID1}/issues/${ID1}/relations`)
+      .send({ toIssueId: ID2, type: "blocks" });
     expect(res.status).toBe(422);
   });
 
-  it("创建重复关系 → 422 (service 层 bug: 应为 409)", async () => {
+  it("创建重复关系 → 422", async () => {
     mockIssueService.getById
-      .mockResolvedValueOnce({ id: "issue-1", companyId: "company-1", identifier: "TEST-1" })
-      .mockResolvedValueOnce({ id: "issue-2", companyId: "company-1" });
-    mockRelationService.create.mockRejectedValue(
-      Object.assign(new Error("Relation already exists"), { status: 422 }),
-    );
+      .mockResolvedValueOnce({ id: ID1, companyId: CID1, identifier: "TEST-1" })
+      .mockResolvedValueOnce({ id: ID2, companyId: CID1 });
+    mockRelationService.create.mockRejectedValue(unprocessable("Relation already exists"));
     const app = createApp();
     const res = await request(app)
-      .post("/api/companies/company-1/issues/issue-1/relations")
-      .send({ toIssueId: "issue-2", type: "blocks" });
-    expect(res.status).toBe(422); // 注: WLF-135 需求期望 409，但实现返回 422
+      .post(`/api/companies/${CID1}/issues/${ID1}/relations`)
+      .send({ toIssueId: ID2, type: "blocks" });
+    expect(res.status).toBe(422);
   });
 });
 
 describe("API: DELETE /issues/:issueId/relations/:relationId — 跨公司访问", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockIssueService.getByIdentifier.mockResolvedValue(null);
   });
 
   it("删除存在的 relation → 200", async () => {
-    mockRelationService.getById.mockResolvedValue({
-      id: "rel-1", fromIssueId: "issue-1", companyId: "company-1",
+    mockRelationService.getById.mockResolvedValueOnce({
+      id: REL1, fromIssueId: ID1, companyId: CID1,
     });
-    mockIssueService.getById.mockResolvedValue({ id: "issue-1", companyId: "company-1" });
-    mockRelationService.remove.mockResolvedValue({ id: "rel-1" });
-    const app = createApp({ companyIds: ["company-1"] });
+    mockIssueService.getById.mockResolvedValueOnce({ id: ID1, companyId: CID1 });
+    mockRelationService.remove.mockResolvedValue({ id: REL1 });
+    const app = createApp({ companyIds: [CID1] });
     const res = await request(app)
-      .delete("/api/issues/issue-1/relations/rel-1");
+      .delete(`/api/issues/${ID1}/relations/${REL1}`);
     expect(res.status).toBe(200);
   });
 
   it("relation 不存在 → 404", async () => {
-    mockRelationService.getById.mockResolvedValue(null);
+    mockRelationService.getById.mockResolvedValueOnce(null);
+    mockIssueService.getById.mockResolvedValueOnce(null);
     const app = createApp();
     const res = await request(app)
-      .delete("/api/issues/issue-1/relations/nonexistent");
+      .delete(`/api/issues/${ID1}/relations/nonexistent`);
     expect(res.status).toBe(404);
   });
 
   it("relation 属于其他公司 board 无权访问 → 403", async () => {
-    mockRelationService.getById.mockResolvedValue({
-      id: "rel-1", fromIssueId: "issue-1", companyId: "company-2",
+    mockRelationService.getById.mockResolvedValueOnce({
+      id: REL1, fromIssueId: ID1, companyId: CID2,
     });
-    // 注意: board actor 的 companyIds = ["company-1"]，无法访问 company-2
-    const app = createApp({ companyIds: ["company-1"] });
+    const app = createApp({ companyIds: [CID1] });
     const res = await request(app)
-      .delete("/api/issues/issue-1/relations/rel-1");
+      .delete(`/api/issues/${ID1}/relations/${REL1}`);
     expect(res.status).toBe(403);
   });
 
   it("relation.fromIssueId 与路径 issueId 不匹配 → 404", async () => {
-    mockRelationService.getById.mockResolvedValue({
-      id: "rel-1", fromIssueId: "issue-99", companyId: "company-1",
+    mockRelationService.getById.mockResolvedValueOnce({
+      id: REL1, fromIssueId: ID3, companyId: CID1,
     });
-    mockIssueService.getById.mockResolvedValue({ id: "issue-1", companyId: "company-1" });
-    const app = createApp({ companyIds: ["company-1"] });
+    mockIssueService.getById.mockResolvedValueOnce({ id: ID1, companyId: CID1 });
+    const app = createApp({ companyIds: [CID1] });
     const res = await request(app)
-      .delete("/api/issues/issue-1/relations/rel-1");
+      .delete(`/api/issues/${ID1}/relations/${REL1}`);
     expect(res.status).toBe(404);
   });
 });
