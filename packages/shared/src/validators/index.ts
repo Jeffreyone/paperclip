@@ -111,11 +111,9 @@ export {
   createSecretSchema,
   rotateSecretSchema,
   updateSecretSchema,
-  revokeSecretSchema,
   type CreateSecret,
   type RotateSecret,
   type UpdateSecret,
-  type RevokeSecret,
 } from "./secret.js";
 
 export {

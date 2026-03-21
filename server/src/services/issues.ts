@@ -66,6 +66,8 @@ export interface IssueFilters {
   parentId?: string;
   labelId?: string;
   q?: string;
+  estimatePointsMin?: number;
+  estimatePointsMax?: number;
 }
 
 type IssueRow = typeof issues.$inferSelect;
