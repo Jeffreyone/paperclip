@@ -39,6 +39,7 @@ import {
 } from "@paperclipai/plugin-sdk";
 import type {
   JsonRpcId,
+  JsonRpcMessage,
   JsonRpcResponse,
   JsonRpcRequest,
   JsonRpcNotification,
@@ -418,7 +419,7 @@ export function createPluginWorkerHandle(
     if (!childProcess?.stdin?.writable) {
       throw new Error(`Worker process for plugin "${pluginId}" is not writable`);
     }
-    const serialized = serializeMessage(message as any);
+    const serialized = serializeMessage(message as JsonRpcMessage);
     childProcess.stdin.write(serialized);
   }
 

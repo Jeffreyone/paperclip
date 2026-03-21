@@ -5,6 +5,7 @@ export default defineConfig({
   out: "./src/migrations",
   dialect: "postgresql",
   dbCredentials: {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     url: process.env.DATABASE_URL!,
   },
 });
